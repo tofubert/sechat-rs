@@ -38,6 +38,7 @@ pub struct NCReqDataMessageParameter {
     name: String,
 }
 
+
 impl NCRequest {
     pub fn new() -> Result<NCRequest, Box<dyn Error>> {
         use std::io::Write;

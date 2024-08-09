@@ -5,14 +5,14 @@ pub struct NCReqDataParticipants {
     attendeeId: i32,
     actorType: String,
     actorId: String,
-    displayName: String,
+    pub displayName: String,
     participantType: i32,
     lastPing: i32,
     inCall: i32,
     permissions: i32,
     attendeePermissions: i32,
     sessionIds: Vec<String>,
-    status: Option<String>,
+    pub status: Option<String>,
     statusIcon: Option<String>,
     statusMessage: Option<String>,
     statusClearAt: Option<i32>,
@@ -39,6 +39,7 @@ pub struct NCReqDataUser {
     subline: String,
     shareWithDisplayNameUnique: String,
 }
+
 
 fn str_or_status<'de, D>(deserializer: D) -> Result<NCReqDataUserStatus, D::Error>
 where

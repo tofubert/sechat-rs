@@ -167,6 +167,23 @@ impl NCRoom {
         self.room_data.unreadMessages > 0
     }
 
+    pub fn is_dm(&self) -> bool {
+        match self.room_type {
+            NCRoomTypes::OneToOne | NCRoomTypes::NoteToSelf | NCRoomTypes::ChangeLog => true,
+            NCRoomTypes::Deprecated | NCRoomTypes::Group | NCRoomTypes::Public => false,
+        }
+    }
+
+    pub fn is_group(&self) -> bool {
+        match self.room_type {
+            NCRoomTypes::Deprecated
+            | NCRoomTypes::OneToOne
+            | NCRoomTypes::NoteToSelf
+            | NCRoomTypes::ChangeLog => false,
+            NCRoomTypes::Group | NCRoomTypes::Public => true,
+        }
+    }
+
     pub fn get_unread(&self) -> usize {
         self.room_data.unreadMessages.as_()
     }
@@ -177,6 +194,9 @@ impl NCRoom {
 
     pub fn get_last_read(&self) -> i32 {
         self.room_data.lastReadMessage
+    }
+    pub fn get_users(&self) -> &Vec<NCReqDataParticipants> {
+        &self.participants
     }
 
     pub async fn update_if_id_is_newer(
