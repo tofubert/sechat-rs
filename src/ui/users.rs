@@ -1,4 +1,5 @@
 use itertools::Itertools;
+
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Cell, HighlightSpacing, Row, Table, TableState},
