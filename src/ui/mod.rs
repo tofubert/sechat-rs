@@ -4,6 +4,7 @@ pub mod chat_selector;
 pub mod help_box;
 pub mod input_box;
 pub mod title_bar;
+pub mod users;
 
 use super::{
     backend::nc_talk::NCTalk,
@@ -284,6 +285,7 @@ async fn handle_key_in_reading(
         KeyCode::Char('o') => app.current_screen = CurrentScreen::Opening,
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
+        KeyCode::Char('u') => app.toggle_user_sidebar(),
         _ => (),
     };
     Ok(())
