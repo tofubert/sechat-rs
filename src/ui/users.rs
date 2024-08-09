@@ -39,7 +39,10 @@ impl<'a> Users<'a> {
                     "offline" => cell.set_style(Style::new().gray()),
                     "dnd" => cell.set_style(Style::new().red()),
                     "online" => cell.set_style(Style::new().green()),
-                    _ => cell.set_style(Style::new()),
+                    unknown => {
+                        log::debug!("Unknown Status {unknown}");
+                        cell.set_style(Style::new())
+                    }
                 }
             };
             self.user_list.push(Row::new([cell]));
