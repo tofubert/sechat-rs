@@ -1,8 +1,9 @@
 use crate::{
     backend::nc_talk::NCTalk,
+    config,
     ui::{
         chat_box::ChatBox, chat_selector::ChatSelector, help_box::HelpBox, input_box::InputBox,
-        title_bar::TitleBar,
+        title_bar::TitleBar, users::Users,
     },
 };
 use ratatui::{prelude::*, widgets::Paragraph};
@@ -26,6 +27,8 @@ pub struct App<'a> {
     pub selector: ChatSelector<'a>,
     input: InputBox,
     help: HelpBox,
+    users: Users<'a>,
+    user_sidebar_visible: bool,
 }
 
 impl<'a> App<'a> {
@@ -46,8 +49,14 @@ impl<'a> App<'a> {
                 chat.select_last_message();
                 chat
             },
+            users: {
+                let mut users = Users::new();
+                users.update(&backend);
+                users
+            },
             backend,
             help: HelpBox::default(),
+            user_sidebar_visible: config::get().data.ui.user_sidebar_default,
         }
     }
 
@@ -73,9 +82,22 @@ impl<'a> App<'a> {
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(4), Constraint::Length(3)])
                 .split(base_layout[1]);
-            self.chat
-                .set_width_and_update_if_change(main_layout[0].width, &self.backend);
-            self.chat.render_area(f, main_layout[0]);
+
+            if self.user_sidebar_visible && self.backend.get_current_room().is_group() {
+                let chat_layout = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Percentage(80), Constraint::Percentage(20)])
+                    .split(main_layout[0]);
+                self.chat
+                    .set_width_and_update_if_change(chat_layout[0].width, &self.backend);
+                self.chat.render_area(f, chat_layout[0]);
+                self.users.render_area(f, chat_layout[1]);
+            } else {
+                self.chat
+                    .set_width_and_update_if_change(main_layout[0].width, &self.backend);
+                self.chat.render_area(f, main_layout[0]);
+            };
+
             self.input.render_area(f, main_layout[1]);
         }
         self.title.update(self.current_screen, &self.backend);
@@ -93,6 +115,7 @@ impl<'a> App<'a> {
         self.title.update(self.current_screen, &self.backend);
         self.selector.update(&self.backend)?;
         self.chat.update_messages(&self.backend);
+        self.users.update(&self.backend);
         Ok(())
     }
 
@@ -145,6 +168,10 @@ impl<'a> App<'a> {
 
     pub fn scroll_down(&mut self) {
         self.chat.select_down();
+    }
+
+    pub fn toggle_user_sidebar(&mut self) {
+        self.user_sidebar_visible = !self.user_sidebar_visible;
     }
 
     pub fn click_at(&mut self, position: Position) -> Result<(), Box<dyn Error>> {

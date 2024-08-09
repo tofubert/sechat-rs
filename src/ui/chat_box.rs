@@ -29,7 +29,7 @@ impl<'a> ChatBox<'a> {
     }
 
     pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &NCTalk) {
-        let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10) / 5 * 4;
+        let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
             self.update_messages(backend);
