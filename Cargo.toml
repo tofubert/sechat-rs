@@ -58,6 +58,7 @@ tracing = "0.1.40"
 cfg-if = "1.0.0"
 tui-textarea = "0.6.1"
 async-trait = "0.1.83"
+serde_with = "3.9.0"
 
 [lints.clippy]
 pedantic = "warn"

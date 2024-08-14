@@ -7,6 +7,7 @@ use ratatui::{
 use style::Styled;
 
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
+use crate::config;
 
 pub struct Users<'a> {
     user_list: Vec<Row<'a>>,
@@ -39,10 +40,16 @@ impl<'a> Users<'a> {
                 Row::new([{
                     if let Some(status) = &user.status {
                         Cell::new(user.displayName.to_string()).set_style(match status.as_str() {
-                            "away" => Style::new().blue(),
-                            "offline" => Style::new().gray(),
-                            "dnd" => Style::new().red(),
-                            "online" => Style::new().green(),
+                            "away" => {
+                                cell.set_style(Style::new().fg(config::get().theme.user_away))
+                            }
+                            "offline" => {
+                                cell.set_style(Style::new().fg(config::get().theme.user_offline))
+                            }
+                            "dnd" => cell.set_style(Style::new().fg(config::get().theme.user_dnd)),
+                            "online" => {
+                                cell.set_style(Style::new().fg(config::get().theme.user_online))
+                            }
                             unknown => {
                                 log::debug!("Unknown Status {unknown}");
                                 Style::new()
