@@ -46,6 +46,7 @@ libc = "0.2.158"
 strip-ansi-escapes = "0.2.0"
 tracing = "0.1.40"
 cfg-if = "1.0.0"
+serde_with = "3.9.0"
 
 [lints.clippy]
 pedantic = "warn"

@@ -4,7 +4,7 @@ use ratatui::{
 };
 use style::Styled;
 
-use crate::backend::nc_talk::NCTalk;
+use crate::{backend::nc_talk::NCTalk, config};
 
 pub struct Users<'a> {
     user_list: Vec<Row<'a>>,
@@ -35,10 +35,10 @@ impl<'a> Users<'a> {
             let mut cell = Cell::new(user.displayName.to_string());
             if let Some(status) = user.status {
                 cell = match status.as_str() {
-                    "away" => cell.set_style(Style::new().blue()),
-                    "offline" => cell.set_style(Style::new().gray()),
-                    "dnd" => cell.set_style(Style::new().red()),
-                    "online" => cell.set_style(Style::new().green()),
+                    "away" => cell.set_style(Style::new().fg(config::get().theme.user_away)),
+                    "offline" => cell.set_style(Style::new().fg(config::get().theme.user_offline)),
+                    "dnd" => cell.set_style(Style::new().fg(config::get().theme.user_dnd)),
+                    "online" => cell.set_style(Style::new().fg(config::get().theme.user_online)),
                     unknown => {
                         log::debug!("Unknown Status {unknown}");
                         cell.set_style(Style::new())

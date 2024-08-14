@@ -1,10 +1,12 @@
 mod data;
+mod theme;
 
 use color_eyre::eyre::eyre;
 use data::Data;
 use etcetera::{app_strategy::Xdg, choose_app_strategy, AppStrategy, AppStrategyArgs};
 use log::LevelFilter;
 use std::{path::PathBuf, process::exit, sync::OnceLock};
+use theme::Theme;
 use toml_example::TomlExample;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -12,6 +14,7 @@ static CONFIG: OnceLock<Config> = OnceLock::new();
 #[derive(Debug)]
 pub struct Config {
     pub data: Data,
+    pub theme: Theme,
     strategy: Xdg,
 }
 
@@ -98,6 +101,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             data: Data::default(),
+            theme: Theme::default(),
             strategy: choose_app_strategy(AppStrategyArgs {
                 top_level_domain: "org".to_string(),
                 author: "emlix".to_string(),

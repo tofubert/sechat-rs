@@ -1,4 +1,4 @@
-use crate::{backend::nc_talk::NCTalk, ui::app::CurrentScreen};
+use crate::{backend::nc_talk::NCTalk, config, ui::app::CurrentScreen};
 use num_traits::AsPrimitive;
 use ratatui::{
     prelude::*,
@@ -54,12 +54,16 @@ impl<'a> Widget for &TitleBar<'a> {
         let (room_title, room_title_style) = if self.unread > 0 {
             (
                 format!("Current: {}: {}", self.room, self.unread),
-                Style::default().fg(Color::White).bg(Color::Red),
+                Style::default()
+                    .fg(config::get().theme.foreground_unread_message)
+                    .bg(config::get().theme.backround_unread_message),
             )
         } else {
             (
                 format!("Current: {}", self.room),
-                Style::default().fg(Color::Green),
+                Style::default()
+                    .fg(config::get().theme.foreground_titlebar)
+                    .bg(config::get().theme.backround),
             )
         };
 
