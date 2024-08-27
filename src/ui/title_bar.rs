@@ -15,10 +15,10 @@ pub struct TitleBar<'a> {
 }
 
 impl<'a> TitleBar<'a> {
-    pub fn new(inital_state: CurrentScreen, room: String) -> TitleBar<'a> {
+    pub fn new(initial_state: CurrentScreen, room: String) -> TitleBar<'a> {
         TitleBar {
             room,
-            mode: inital_state.to_string(),
+            mode: initial_state.to_string(),
             unread: 0,
             unread_rooms: Text::raw(""),
         }

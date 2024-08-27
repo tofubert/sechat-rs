@@ -53,7 +53,7 @@ impl<'a> ChatBox<'a> {
             .map(std::borrow::Cow::into_owned)
             .map(Line::from)
             .collect_vec();
-            let mut row_hight: u16 = name.len().try_into().unwrap();
+            let mut row_height: u16 = name.len().try_into().unwrap();
 
             let message_string = message_data
                 .get_message()
@@ -66,8 +66,8 @@ impl<'a> ChatBox<'a> {
                         .collect_vec()
                 })
                 .collect_vec();
-            if message_string.len() > row_hight as usize {
-                row_hight = message_string.len().try_into().unwrap();
+            if message_string.len() > row_height as usize {
+                row_height = message_string.len().try_into().unwrap();
             };
             let message: Vec<Cell> = vec![
                 message_data.get_time_str().into(),
@@ -75,7 +75,7 @@ impl<'a> ChatBox<'a> {
                 message_string.into(),
             ];
 
-            self.messages.push(Row::new(message).height(row_hight));
+            self.messages.push(Row::new(message).height(row_height));
 
             if message_data.has_reactions() {
                 let reaction: Vec<Cell> = vec![

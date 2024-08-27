@@ -375,7 +375,7 @@ impl NCRequest {
         }
     }
 
-    pub async fn fetch_rooms_inital(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
+    pub async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
         self.request_rooms(None).await
     }
 
@@ -423,13 +423,13 @@ impl NCRequest {
         }
     }
 
-    pub async fn fetch_chat_inital(
+    pub async fn fetch_chat_initial(
         &self,
         token: &str,
         maxMessage: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
         let response_result = self.request_chat(token, maxMessage, None).await;
-        // Inital results come last to first. And we want the latest message always to be at the end.
+        // Initial results come last to first. And we want the latest message always to be at the end.
         match response_result {
             Ok(Some(mut response)) => {
                 response.reverse();

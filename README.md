@@ -23,13 +23,13 @@ To switch to Editing use "e" or "i". To switch back to Reading use "ESC".
 Sending Messages is done via "Enter", which also switches back to Reading.
 
 #### Opening
-When in Reading Mode Press "o" to enter the Openening screen.
-Use the Arrow keys to select a Room. Use "Enter" to open the Room. Once Enter is pressed the Cleint fetches new messages for the Room, hence a short delay might ocure.
+When in Reading Mode Press "o" to enter the Opening screen.
+Use the Arrow keys to select a Room. Use "Enter" to open the Room. Once Enter is pressed the Client fetches new messages for the Room, hence a short delay might ocure.
 Use "Esc" to exit back to the current chat.
 
 #### Exiting
-When in Reading Mode Press "q" to enter the Quiting Screen, confirm with "y" or abort with "n".
-On Exit all log files are written to the folder choosen in the config file.
+When in Reading Mode Press "q" to enter the Quitting Screen, confirm with "y" or abort with "n".
+On Exit all log files are written to the folder chosen in the config file.
 
 #### Help
 Use "?" to get to the help screen.
