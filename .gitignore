@@ -7,3 +7,4 @@ devlogs
 config_*.toml
 CONFIG_*.toml
 .vscode/settings.json
+.pre-commit-config.yaml
