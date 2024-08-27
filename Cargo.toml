@@ -2,8 +2,11 @@
 name = "seshat-rs"
 description = "A TUI based chat client for Nextcloud Talk"
 readme = "README.md"
+license-file = "LICENSE"
 version = "0.1.0-beta"
 edition = "2018"
+categories = ["command-line-utilities"]
+keywords = ["tui", "nextcloud", "nextcloud-talk"]
 authors = ["tofu <sechat@tofuli.de>"]
 documentation = "https://github.com/tofubert/sechat-rs"
 repository = "https://github.com/tofubert/sechat-rs"
