@@ -38,3 +38,6 @@ Use "?" to get to the help screen.
 Please open issues in the issue tracker.
 A list of outstanding freatures is also kept there.
 
+## Sponsors
+Thanks to [emlix gmbh](https://github.com/emlix) for allowing @tofubert and other so spend some of their work time to tinker with this. 
+
