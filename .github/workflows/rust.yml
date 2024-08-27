@@ -87,6 +87,7 @@ jobs:
     - uses: taiki-e/install-action@v2
       with:
         tool: cargo-make
+    - uses: Swatinem/rust-cache@v2
     - name: Build
       run: cargo make build
       env:
