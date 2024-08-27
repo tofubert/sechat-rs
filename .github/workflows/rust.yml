@@ -11,15 +11,25 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
+      
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
     - name: Run tests
-      run: cargo test --verbose && cargo install cargo-tarpaulin && cargo tarpaulin --ignore-tests
+      run: cargo test --verbose 
+    - name: Install and run tarpaulin
+      run: cargo install cargo-tarpaulin && cargo tarpaulin --ignore-tests
+      
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
     - name: lint
       run: rustup component add clippy && cargo clippy -- -D warnings
     - name: format
