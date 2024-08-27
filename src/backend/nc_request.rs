@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
-use json;
+use jzon;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client, Response, Url};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -542,7 +542,7 @@ impl NCRequest {
             let mut name = path.clone();
             name.push(url.replace('/', "_"));
             let mut file = File::create(name)?;
-            let pretty_text = json::stringify_pretty(json::parse(text)?, 2);
+            let pretty_text = jzon::stringify_pretty(jzon::parse(text)?, 2);
             file.write_all(pretty_text.as_bytes())?;
         }
         Ok(())
