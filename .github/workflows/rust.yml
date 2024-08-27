@@ -62,7 +62,7 @@ jobs:
       - run: cargo make check
         env:
           RUST_BACKTRACE: full
-  
+
   coverage:
     runs-on: ubuntu-latest
     steps:
@@ -79,7 +79,7 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
-      
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -91,4 +91,3 @@ jobs:
       run: cargo make build
       env:
           RUST_BACKTRACE: full
-      

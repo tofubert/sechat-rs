@@ -4,11 +4,11 @@
 
 * run "cargo r" or "sechat-rs" and enjoy
 * If no config is found a default config will be created, which you can fill in.
-* a "-c" Option for console exists, if none is proveded it will default to XDG default paths. 
+* a "-c" Option for console exists, if none is proveded it will default to XDG default paths.
 * Logs will be written to "dev.log". This is so we dont write log output into the terminal UI.
 
 ## Logs
-Logs will stored in the related XDG data dir. 
+Logs will stored in the related XDG data dir.
 You can suppress both app log output and json dumping of failed http requests through the config.
 The chat history goes into the data dir as well.
 Your full chat history is stored unencrypted on disk!
@@ -39,5 +39,4 @@ Please open issues in the issue tracker.
 A list of planned and requested freatures is also kept there.
 
 ## Sponsors
-Thanks to [emlix gmbh](https://github.com/emlix) for allowing [@tofu](https://github.com/tofubert) and other so spend some of their work time to tinker with this. 
-
+Thanks to [emlix gmbh](https://github.com/emlix) for allowing [@tofu](https://github.com/tofubert) and other so spend some of their work time to tinker with this.
