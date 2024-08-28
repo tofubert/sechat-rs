@@ -12,8 +12,10 @@ impl From<NCReqDataMessage> for NCMessage {
 
 impl NCMessage {
     pub fn get_time_str(&self) -> String {
-        let time: DateTime<Local> =
-            DateTime::from(DateTime::<Utc>::from_timestamp(self.0.timestamp, 0).unwrap());
+        let time: DateTime<Local> = DateTime::from(
+            DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
+                .expect("cannot convert UTC time stamp"),
+        );
         time.format("%H:%M").to_string()
     }
 
