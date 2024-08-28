@@ -8,6 +8,10 @@
 [![Dependency status](https://deps.rs/repo/github/tofubert/sechat-rs/status.svg)](https://deps.rs/repo/github/tofubert/sechat-rs)
 
 
+
+> [!WARNING]
+> This Software is not a fully stable client. You should not rely on this client for important chats!
+
 ## Setup
 
 * run "cargo r" or "sechat" and enjoy
