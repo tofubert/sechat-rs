@@ -74,9 +74,9 @@ impl NCTalk {
         tmp_path_buf.push("Talk.json");
         let path = tmp_path_buf.as_path();
 
-        let (response, last_requested) = requester.fetch_rooms_inital().await?;
+        let (response, last_requested) = requester.fetch_rooms_initial().await?;
 
-        let mut inital_messge_ids: HashMap<String, &NCReqDataRoom> = response
+        let mut initial_message_ids: HashMap<String, &NCReqDataRoom> = response
             .iter()
             .map(|room| (room.token.clone(), room))
             .collect::<HashMap<String, &NCReqDataRoom>>();
@@ -102,25 +102,25 @@ impl NCTalk {
                 for (token, room_future) in &mut handles {
                     //we can safely unwrap here bc the json file on disk shall never be this broken.
                     let mut json_room = room_future.await?.unwrap();
-                    if inital_messge_ids.contains_key(token) {
-                        let message_id = inital_messge_ids.get(token).unwrap().lastMessage.id;
+                    if initial_message_ids.contains_key(token) {
+                        let message_id = initial_message_ids.get(token).unwrap().lastMessage.id;
                         json_room
                             .update_if_id_is_newer(
                                 message_id,
-                                Some(inital_messge_ids.get(token).unwrap()),
+                                Some(initial_message_ids.get(token).unwrap()),
                             )
                             .await?;
                         rooms.insert(token.clone(), json_room);
-                        inital_messge_ids.remove(token);
+                        initial_message_ids.remove(token);
                     } else {
                         log::warn!("Room was deleted upstream, failed to locate!");
                         //TODO: remove old chat log!!
                     }
                 }
-                if !inital_messge_ids.is_empty() {
+                if !initial_message_ids.is_empty() {
                     let remaining_room_data = response
                         .iter()
-                        .filter(|data| inital_messge_ids.contains_key(&data.token))
+                        .filter(|data| initial_message_ids.contains_key(&data.token))
                         .cloned()
                         .collect::<Vec<NCReqDataRoom>>();
                     NCTalk::parse_response(
@@ -131,7 +131,10 @@ impl NCTalk {
                         chat_log_path.clone(),
                     )
                     .await;
-                    log::debug!("New Room adds, missing in logs {}", inital_messge_ids.len());
+                    log::debug!(
+                        "New Room adds, missing in logs {}",
+                        initial_message_ids.len()
+                    );
                 }
                 log::info!("Loaded Rooms from log files");
             } else {
@@ -313,7 +316,7 @@ impl NCTalk {
                 .fetch_rooms_update(self.last_requested)
                 .await?
         } else {
-            self.requester.fetch_rooms_inital().await?
+            self.requester.fetch_rooms_initial().await?
         };
         self.last_requested = timestamp;
         for room in response {

@@ -3,7 +3,7 @@
 #![allow(dead_code)]
 
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
-use json;
+use jzon;
 use reqwest::header::HeaderMap;
 use reqwest::{header, Client, Response, Url};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -375,7 +375,7 @@ impl NCRequest {
         }
     }
 
-    pub async fn fetch_rooms_inital(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
+    pub async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
         self.request_rooms(None).await
     }
 
@@ -423,13 +423,13 @@ impl NCRequest {
         }
     }
 
-    pub async fn fetch_chat_inital(
+    pub async fn fetch_chat_initial(
         &self,
         token: &str,
         maxMessage: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
         let response_result = self.request_chat(token, maxMessage, None).await;
-        // Inital results come last to first. And we want the latest message always to be at the end.
+        // Initial results come last to first. And we want the latest message always to be at the end.
         match response_result {
             Ok(Some(mut response)) => {
                 response.reverse();
@@ -542,7 +542,7 @@ impl NCRequest {
             let mut name = path.clone();
             name.push(url.replace('/', "_"));
             let mut file = File::create(name)?;
-            let pretty_text = json::stringify_pretty(json::parse(text)?, 2);
+            let pretty_text = jzon::stringify_pretty(jzon::parse(text)?, 2);
             file.write_all(pretty_text.as_bytes())?;
         }
         Ok(())

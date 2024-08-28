@@ -42,7 +42,7 @@ impl NCRoom {
         messages: &mut Vec<NCMessage>,
     ) -> Result<(), Box<dyn Error>> {
         let response = requester
-            .fetch_chat_inital(token.clone().as_str(), 200)
+            .fetch_chat_initial(token.clone().as_str(), 200)
             .await?;
         for message in response {
             messages.push(message.into());

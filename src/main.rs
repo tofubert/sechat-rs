@@ -7,7 +7,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Path of the configuration File, if ommited will try default config paths.
+    /// Path of the configuration File, if omitted will try default config paths.
     /// Default XDG based path is generally encouraged.
     #[arg(short, long, value_name = "PATH", default_value = "")]
     config_path: String,

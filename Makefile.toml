@@ -1,0 +1,78 @@
+# configuration for https://github.com/sagiegurari/cargo-make
+
+[config]
+skip_core_tasks = true
+
+[tasks.default]
+alias = "ci"
+
+[tasks.ci]
+description = "Run continuous integration tasks"
+dependencies = ["lint", "clippy", "check", "test"]
+
+
+[tasks.clippy]
+description = "Run Clippy for linting"
+command = "cargo"
+args = [
+  "clippy",
+  "--all-targets",
+  "--all-features",
+  "--tests",
+  "--benches",
+  "--",
+  "-W",
+  "clippy::pedantic",
+  "-D",
+  "warnings",
+]
+
+[tasks.lint]
+description = "Lint code style (formatting, typos, docs, markdown)"
+dependencies = ["lint-format"]
+
+[tasks.lint-format]
+description = "Lint code formatting"
+command = "cargo"
+args = ["fmt", "--all", "--check"]
+
+[tasks.format]
+description = "Fix code formatting"
+command = "cargo"
+args = ["fmt", "--all"]
+
+[tasks.lint-typos]
+description = "Run typo checks"
+install_crate = { crate_name = "typos-cli", binary = "typos", test_arg = "--version" }
+command = "typos"
+
+[tasks.audit]
+command = "cargo"
+install_crate = "cargo-audit"
+args = ["audit", "-D", "warnings"]
+
+
+[tasks.check]
+description = "Check code for errors and warnings"
+command = "cargo"
+args = ["check", "--all-targets", "--all-features"]
+
+[tasks.coverage]
+description = "Generate code coverage report"
+command = "cargo"
+args = [
+  "llvm-cov",
+  "--lcov",
+  "--output-path",
+  "target/lcov.info",
+]
+
+[tasks.build]
+command = "cargo"
+args = ["build"]
+dependencies = ["format", "clippy", "audit"]
+
+[tasks.test]
+command = "cargo"
+args = ["test"]
+dependencies = ["build"]

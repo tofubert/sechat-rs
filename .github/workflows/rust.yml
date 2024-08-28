@@ -1,38 +1,94 @@
-name: Rust
+name: Continuous Integration
 
 on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+  merge_group:
+
+# ensure that the workflow is only triggered once per PR,  subsequent pushes to the PR will cancel
+# and restart the workflow. See https://docs.github.com/en/actions/using-jobs/using-concurrency
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-make
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo make lint-format
+
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-make
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo make lint-typos
+
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-make
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo make clippy
+
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: taiki-e/install-action@cargo-make
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo make check
+        env:
+          RUST_BACKTRACE: full
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-make
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo make coverage
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-make
+    - uses: Swatinem/rust-cache@v2
     - name: Build
-      run: cargo build --verbose
-      
-  test:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Run tests
-      run: cargo test --verbose 
-    - name: Install and run tarpaulin
-      run: cargo install cargo-tarpaulin && cargo tarpaulin --ignore-tests
-      
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: lint
-      run: rustup component add clippy && cargo clippy -- -D warnings
-    - name: format
-      run: rustup component add rustfmt && cargo fmt -- --check
-    - name: audit
-      run: cargo install cargo-audit && cargo audit
+      run: cargo make build
+      env:
+          RUST_BACKTRACE: full
