@@ -195,3 +195,31 @@ impl Config {
         log4rs::init_config(config).expect("Failed to init logging");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // use super::*;
+
+    #[test]
+    #[should_panic(expected = "config not initialized")]
+    fn get_config_before_init() {
+        super::get();
+    }
+    #[test]
+    #[should_panic(
+        expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
+    )]
+    fn init_with_faulty_path() {
+        super::init("/test");
+    }
+    #[test]
+    fn init_with_no_path() {
+        super::init("");
+    }
+    #[test]
+    #[should_panic(expected = "Could not set global config!: failed to set config Config")]
+    fn init_config_twice() {
+        super::init("");
+        super::init("");
+    }
+}
