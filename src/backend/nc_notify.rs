@@ -11,11 +11,12 @@ pub struct NCNotify {
 
 impl NCNotify {
     pub fn new() -> Self {
+        let data = &config::get().data;
         NCNotify {
-            app_name: config::get().data.general.chat_server_name.clone(),
-            timeout_ms: config::get().data.notifications.timeout_ms,
-            persistent: config::get().data.notifications.persistent,
-            silent: config::get().data.notifications.silent,
+            app_name: data.general.chat_server_name.clone(),
+            timeout_ms: data.notifications.timeout_ms,
+            persistent: data.notifications.persistent,
+            silent: data.notifications.silent,
         }
     }
 
