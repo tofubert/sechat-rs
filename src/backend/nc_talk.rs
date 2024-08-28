@@ -35,15 +35,14 @@ impl NCTalk {
         rooms: &mut HashMap<String, NCRoom>,
         chat_log_path: PathBuf,
     ) {
-        let mut v = Vec::new();
-        for child in response {
-            v.push(tokio::spawn(NCTalk::new_room(
+        let v = response.into_iter().map(|child| {
+            tokio::spawn(NCTalk::new_room(
                 child,
                 requester.clone(),
                 notifier.clone(),
                 chat_log_path.clone(),
-            )));
-        }
+            ))
+        });
         for jh in v {
             let (name, room_option) = jh.await.unwrap();
             if let Some(room) = room_option {
