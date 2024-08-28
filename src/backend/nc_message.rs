@@ -40,8 +40,9 @@ impl NCMessage {
         self.0.id
     }
 
-    pub fn clone_data(&self) -> NCReqDataMessage {
-        self.0.clone()
+    /// return inner data message
+    pub fn data(&self) -> &NCReqDataMessage {
+        &self.0
     }
 
     pub fn is_comment(&self) -> bool {
