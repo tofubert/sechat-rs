@@ -26,11 +26,14 @@ impl NCMessage {
     }
 
     pub fn get_reactions_str(&self) -> String {
-        let mut reactions = String::new();
-        for (icon, number) in &self.0.reactions {
-            reactions = reactions + "('" + icon + "' times " + &number.to_string() + "), ";
-        }
-        reactions
+        self.0
+            .reactions
+            .iter()
+            .map(|(icon, number)| format!("('{icon}' times {}), ", &number.to_string()))
+            .collect::<Vec<_>>()
+            .join(", ")
+            // TODO: this was in previous code! is this comma at the end needed?
+            + ", "
     }
 
     pub fn get_id(&self) -> i32 {
