@@ -291,8 +291,7 @@ impl NCRequest {
         token: &str,
     ) -> Result<NCReqDataMessage, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
-        let mut params = HashMap::new();
-        params.insert("message".to_owned(), message.clone());
+        let params = HashMap::from([("message", message)]);
         let url = Url::parse_with_params(&url_string, params)?;
         let response = self.request_post(url).await?;
 
@@ -316,13 +315,10 @@ impl NCRequest {
         name: &str,
     ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/core/autocomplete/get";
-        let mut params = HashMap::new();
-        params.insert("limit".to_owned(), "200".to_string());
-        params.insert("search".to_owned(), name.to_string());
-
+        let params = HashMap::from([("limit", "200"), ("search", name)]);
         let url = Url::parse_with_params(&url_string, params)?;
-
         let response = self.request(url).await?;
+
         match response.status() {
             reqwest::StatusCode::OK => {
                 let text = response.text().await?;
@@ -352,8 +348,7 @@ impl NCRequest {
             + "/ocs/v2.php/apps/spreed/api/v4/room/"
             + token
             + "/participants";
-        let mut params = HashMap::new();
-        params.insert("includeStatus".to_owned(), "true".to_string());
+        let params = HashMap::from([("includeStatus", "true")]);
         let url = Url::parse_with_params(&url_string, params)?;
 
         let response = self.request(url).await?;
@@ -394,10 +389,11 @@ impl NCRequest {
         last_timestamp: Option<i64>,
     ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v4/room";
-        let mut params = HashMap::new();
-        if let Some(timestamp) = last_timestamp {
-            params.insert("modifiedSince".to_owned(), timestamp.to_string());
-        }
+        let params = if let Some(timestamp) = last_timestamp {
+            HashMap::from([("modifiedSince", timestamp.to_string())])
+        } else {
+            HashMap::new()
+        };
         let url = Url::parse_with_params(&url_string, &params)?;
         let response = self.request(url).await?;
         match response.status() {
@@ -466,18 +462,23 @@ impl NCRequest {
         last_message: Option<i32>,
     ) -> Result<Option<Vec<NCReqDataMessage>>, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
-        let mut params = HashMap::new();
-        params.insert("limit".to_owned(), maxMessage.to_string());
-        params.insert("setReadMarker".to_owned(), "0".to_owned());
-        if let Some(lastId) = last_message {
+        let params = if let Some(lastId) = last_message {
             log::debug!("Last MessageID {}", lastId);
-            params.insert("lastKnownMessageId".to_owned(), lastId.to_string());
-            params.insert("lookIntoFuture".to_owned(), "1".to_owned());
-            params.insert("timeout".to_owned(), "0".to_owned());
-            params.insert("includeLastKnown".to_owned(), "0".to_owned());
+            HashMap::from([
+                ("limit", maxMessage.to_string()),
+                ("setReadMarker", "0".into()),
+                ("lookIntoFuture", "1".to_owned()),
+                ("lastKnownMessageId", lastId.to_string()),
+                ("timeout", "0".to_owned()),
+                ("includeLastKnown", "0".to_owned()),
+            ])
         } else {
-            params.insert("lookIntoFuture".to_owned(), "0".to_owned());
-        }
+            HashMap::from([
+                ("limit", maxMessage.to_string()),
+                ("setReadMarker", "0".into()),
+                ("lookIntoFuture", "0".into()),
+            ])
+        };
         let url = Url::parse_with_params(&url_string, &params)?;
         let response = self.request(url).await?;
         match response.status() {
@@ -542,8 +543,10 @@ impl NCRequest {
 
     fn dump_json_to_log(&self, url: &str, text: &str) -> Result<(), Box<dyn Error>> {
         if let Some(path) = &self.json_dump_path {
-            let mut name = path.clone();
-            name.push(url.replace('/', "_"));
+            let name: String = url
+                .chars()
+                .map(|ch| if ch == '/' { '_' } else { ch })
+                .collect();
             let mut file = File::create(name)?;
             let pretty_text = jzon::stringify_pretty(jzon::parse(text)?, 2);
             file.write_all(pretty_text.as_bytes())?;
