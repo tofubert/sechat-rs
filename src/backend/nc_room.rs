@@ -76,7 +76,6 @@ impl NCRoom {
                 .ok();
         }
 
-        let type_num = room_data.roomtype;
         let participants = requester
             .fetch_participants(&room_data.token)
             .await
@@ -85,11 +84,11 @@ impl NCRoom {
         Some(NCRoom {
             requester,
             notifier,
-            room_data,
             messages,
             path_to_log: tmp_path_buf,
-            room_type: FromPrimitive::from_i32(type_num).unwrap(),
+            room_type: FromPrimitive::from_i32(room_data.roomtype).unwrap(),
             participants,
+            room_data,
         })
     }
 
