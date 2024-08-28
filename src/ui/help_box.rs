@@ -49,7 +49,7 @@ impl Widget for &HelpBox {
             )
             .column_spacing(1)
             .style(Style::new().white().on_black())
-            .header(Row::new(vec!["Key", "Name", "Behaviour"]).style(Style::new().bold().blue()))
+            .header(Row::new(vec!["Key", "Name", "Behavior"]).style(Style::new().bold().blue()))
             .block(Block::default())
             .highlight_style(Style::new().green())
             .highlight_spacing(HighlightSpacing::Never),
