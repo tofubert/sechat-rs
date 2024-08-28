@@ -1,5 +1,13 @@
 # Sechat-rs
 
+
+[![Status](https://github.com/tofubert/sechat-rs/actions/workflows/rust.yml/badge.svg)](https://github.com/tofubert/sechat-rs/actions)
+[![Crates.io](https://img.shields.io/crates/v/sechat-rs.svg)](https://crates.io/crates/sechat-rs)
+[![Documentation](https://docs.rs/sechat-rs/badge.svg)](https://docs.rs/sechat-rs/)
+[![Codecov](https://codecov.io/github/tofubert/sechat-rs/branch/main/graph/badge.svg?token=CUBVLZ27KS)](https://codecov.io/github/tofubert/sechat-rs)
+[![Dependency status](https://deps.rs/repo/github/tofubert/sechat-rs/status.svg)](https://deps.rs/repo/github/tofubert/sechat-rs)
+
+
 ## Setup
 
 * run "cargo r" or "sechat-rs" and enjoy
