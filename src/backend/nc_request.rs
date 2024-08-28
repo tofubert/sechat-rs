@@ -467,10 +467,10 @@ impl NCRequest {
             HashMap::from([
                 ("limit", maxMessage.to_string()),
                 ("setReadMarker", "0".into()),
-                ("lookIntoFuture", "1".to_owned()),
+                ("lookIntoFuture", "1".into()),
                 ("lastKnownMessageId", lastId.to_string()),
-                ("timeout", "0".to_owned()),
-                ("includeLastKnown", "0".to_owned()),
+                ("timeout", "0".into()),
+                ("includeLastKnown", "0".into()),
             ])
         } else {
             HashMap::from([
