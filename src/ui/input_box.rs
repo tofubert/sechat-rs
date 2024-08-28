@@ -1,53 +1,36 @@
 use ratatui::{
     prelude::*,
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
 };
+use tui_textarea::TextArea;
 
 #[derive(Default)]
-pub struct InputBox {
-    current_text: String,
+pub struct InputBox<'a> {
+    textarea: TextArea<'a>,
 }
 
-impl InputBox {
-    pub fn new(initial_message: &str) -> InputBox {
-        InputBox {
-            current_text: initial_message.to_string(),
-        }
+impl<'a> InputBox<'a> {
+    pub fn new(initial_message: &str) -> InputBox<'a> {
+        let mut textarea = TextArea::new(vec![initial_message.into()]);
+        textarea.set_block(Block::default().borders(Borders::TOP));
+        InputBox { textarea }
     }
 
     pub fn render_area(&self, frame: &mut Frame, area: Rect) {
-        frame.render_widget(self, area);
+        frame.render_widget(&self.textarea, area);
     }
 }
 
-impl Widget for &InputBox {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let text: Vec<Line> = textwrap::wrap(
-            ("> ".to_string() + &self.current_text).as_str(),
-            area.width as usize,
-        )
-        .into_iter()
-        .map(std::borrow::Cow::into_owned)
-        .map(Line::from)
-        .collect();
-        Paragraph::new(text)
-            .block(Block::default().borders(Borders::TOP))
-            .style(Style::new().white().on_black())
-            .alignment(Alignment::Left)
-            .render(area, buf);
-    }
-}
-
-impl std::ops::Deref for InputBox {
-    type Target = String;
+impl<'a> std::ops::Deref for InputBox<'a> {
+    type Target = TextArea<'a>;
 
     fn deref(&self) -> &Self::Target {
-        &self.current_text
+        &self.textarea
     }
 }
 
-impl std::ops::DerefMut for InputBox {
+impl<'a> std::ops::DerefMut for InputBox<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.current_text
+        &mut self.textarea
     }
 }

@@ -18,13 +18,16 @@ use color_eyre::{
 use crossterm::{
     event::{
         poll, read, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste,
-        EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind,
+        EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+        KeyboardEnhancementFlags, MouseEventKind, PopKeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
 use tracing::error;
+use tui_textarea::{Input, Key};
 
 pub fn install_hooks() -> eyre::Result<()> {
     let (panic_hook, eyre_hook) = HookBuilder::default()
@@ -90,6 +93,17 @@ pub fn init() -> eyre::Result<Tui> {
 
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
+    if execute!(
+        stdout(),
+        PushKeyboardEnhancementFlags(
+            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
+                | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
+        )
+    )
+    .is_err()
+    {
+        log::warn!("Consider using a Terminal that supports KeyboardEnhancementFlags.");
+    }
     if config::get().get_enable_mouse() {
         execute!(stdout(), EnableMouseCapture)?;
     }
@@ -111,6 +125,8 @@ pub fn restore() -> eyre::Result<()> {
     if config::get().get_enable_mouse() {
         execute!(stdout(), DisableMouseCapture)?;
     }
+    //proceed here regardless of error, since this will fail if the terminal doesnt support this.
+    let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
     execute!(stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
     Ok(())
@@ -166,8 +182,8 @@ async fn process_event(
     // It's guaranteed that `read` won't block, because `poll` returned
     // `Ok(true)`.
     match event {
-        Event::Key(key) if key.kind != KeyEventKind::Release => {
-            log::debug!("Processing key event {:?}", key.code);
+        Event::Key(key) => {
+            log::debug!("Processing key event {:?}", key);
             match app.current_screen {
                 CurrentScreen::Helping => handle_key_in_help(key, app),
                 CurrentScreen::Reading => handle_key_in_reading(key, app).await?,
@@ -176,7 +192,9 @@ async fn process_event(
                         return value;
                     }
                 }
-                CurrentScreen::Editing => handle_key_in_editing(key, app).await?,
+                CurrentScreen::Editing => {
+                    handle_key_in_editing(Input::from(event.clone()), app).await?;
+                }
                 CurrentScreen::Opening => handle_key_in_opening(key, app).await?,
             }
         }
@@ -217,22 +235,22 @@ async fn handle_key_in_opening(
 }
 
 async fn handle_key_in_editing(
-    key: KeyEvent,
+    key: Input,
     app: &mut App<'_>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if key.kind == KeyEventKind::Press {
-        match key.code {
-            KeyCode::Enter => {
-                // SEND MEssage
-                app.current_screen = CurrentScreen::Reading;
-                app.send_message().await?;
-            }
-            KeyCode::Backspace => app.pop_input(),
-            KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
-            KeyCode::Char(value) => app.append_input(value),
-            _ => (),
-        };
-    }
+    match key {
+        Input { key: Key::Esc, .. } => app.current_screen = CurrentScreen::Reading,
+        Input {
+            key: Key::Enter,
+            shift: false,
+            ..
+        } => {
+            // SEND MEssage
+            app.current_screen = CurrentScreen::Reading;
+            app.send_message().await?;
+        }
+        _ => app.new_input_key(key),
+    };
 
     Ok(())
 }
