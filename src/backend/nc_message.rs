@@ -57,19 +57,11 @@ impl NCMessage {
     }
 
     pub fn is_edit_note(&self) -> bool {
-        if self.is_system() {
-            self.0.systemMessage == "message_edited"
-        } else {
-            false
-        }
+        self.is_system() && self.0.systemMessage == "message_edited"
     }
 
     pub fn is_reaction(&self) -> bool {
-        if self.is_system() {
-            self.0.systemMessage == "reaction"
-        } else {
-            false
-        }
+        self.is_system() && self.0.systemMessage == "reaction"
     }
 
     pub fn is_command(&self) -> bool {
