@@ -245,10 +245,14 @@ pub struct NCReqOCS<T> {
 
 impl NCRequest {
     pub fn new() -> Result<NCRequest, Box<dyn Error>> {
-        let username = config::get().data.general.user.clone();
-        let password = Some(config::get().data.general.app_pw.clone());
-        let base_url = config::get().data.general.url.clone();
-        let json_dump_path = config::get().get_http_dump_dir();
+        let config = &config::get();
+        let general = &config.data.general;
+
+        let username = general.user.clone();
+        let password = Some(general.app_pw.clone());
+        let base_url = general.url.clone();
+
+        let json_dump_path = config.get_http_dump_dir();
         let mut headers = header::HeaderMap::new();
         headers.insert("OCS-APIRequest", header::HeaderValue::from_static("true"));
         headers.insert(
@@ -259,9 +263,9 @@ impl NCRequest {
         let mut buf = b"Basic ".to_vec();
         {
             let mut encoder = EncoderWriter::new(&mut buf, &BASE64_STANDARD);
-            let _ = write!(encoder, "{username}:");
+            write!(encoder, "{username}:").expect("i/o error");
             if let Some(password) = password {
-                let _ = write!(encoder, "{password}");
+                write!(encoder, "{password}").expect("i/o error");
             }
         }
         let mut auth_value =
