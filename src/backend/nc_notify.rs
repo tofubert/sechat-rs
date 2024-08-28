@@ -26,10 +26,12 @@ impl NCNotify {
         number_of_unread: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let mut notification = Notification::new()
-            .summary(format!("Unread: {room_name}").as_str())
-            .body(format!("You have {number_of_unread} new Messages in {room_name}").as_str())
+            .summary(&format!("Unread: {room_name}"))
+            .body(&format!(
+                "You have {number_of_unread} new Messages in {room_name}"
+            ))
             .icon("dialog-information")
-            .appname(self.app_name.as_str())
+            .appname(&self.app_name)
             .to_owned();
         if self.persistent {
             log::debug!("Persistent Message!");
@@ -47,10 +49,10 @@ impl NCNotify {
 
     pub fn new_room(&self, room_name: &String) -> Result<(), Box<dyn std::error::Error>> {
         let mut notification = Notification::new()
-            .summary(format!("New Room: {room_name}").as_str())
-            .body(format!("You have been added to a new Room {room_name}").as_str())
+            .summary(&format!("New Room: {room_name}"))
+            .body(&format!("You have been added to a new Room {room_name}"))
             .icon("dialog-information")
-            .appname(self.app_name.as_str())
+            .appname(&self.app_name)
             .to_owned();
         if self.persistent {
             notification
