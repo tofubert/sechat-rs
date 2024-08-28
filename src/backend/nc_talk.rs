@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use crate::{
     backend::{
         nc_notify::NCNotify,
@@ -9,13 +7,8 @@ use crate::{
     config::{self},
 };
 use core::panic;
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs::{read_to_string, File},
-    io::prelude::*,
-    path::PathBuf,
-};
+use itertools::Itertools;
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
 #[derive(Debug)]
 pub struct NCTalk {
@@ -84,7 +77,7 @@ impl NCTalk {
 
         if path.exists() {
             if let Ok(mut data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
-                read_to_string(path).unwrap().as_str(),
+                std::fs::read_to_string(path).unwrap().as_str(),
             ) {
                 let mut handles = HashMap::new();
                 for (token, room) in &mut data {
@@ -177,6 +170,8 @@ impl NCTalk {
     }
 
     pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+        use std::io::Write;
+
         let mut data = HashMap::<String, NCReqDataRoom>::new();
         let mut tmp_path_buf = self.chat_data_path.clone();
         tmp_path_buf.push("Talk.json");
@@ -186,7 +181,7 @@ impl NCTalk {
             room.write_to_log()?;
         }
         // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = match File::create(path) {
+        let mut file = match std::fs::File::create(path) {
             Err(why) => {
                 log::warn!(
                     "couldn't create top level log file {}: {}",

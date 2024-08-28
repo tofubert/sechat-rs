@@ -6,13 +6,6 @@ use super::{
 use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
-use std::{
-    cmp::Ordering,
-    error::Error,
-    fs::{read_to_string, File},
-    io::prelude::*,
-    path::PathBuf,
-};
 
 #[derive(Debug, FromPrimitive, PartialEq)]
 pub enum NCRoomTypes {
@@ -30,7 +23,7 @@ pub struct NCRoom {
     notifier: NCNotify,
     pub messages: Vec<NCMessage>,
     room_data: NCReqDataRoom,
-    path_to_log: PathBuf,
+    path_to_log: std::path::PathBuf,
     pub room_type: NCRoomTypes,
     participants: Vec<NCReqDataParticipants>,
 }
@@ -40,7 +33,7 @@ impl NCRoom {
         requester: NCRequest,
         token: String,
         messages: &mut Vec<NCMessage>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let response = requester
             .fetch_chat_initial(token.clone().as_str(), 200)
             .await?;
@@ -54,7 +47,7 @@ impl NCRoom {
         room_data: NCReqDataRoom,
         requester: NCRequest,
         notifier: NCNotify,
-        path_to_log: PathBuf,
+        path_to_log: std::path::PathBuf,
     ) -> Option<NCRoom> {
         let mut tmp_path_buf = path_to_log.clone();
         tmp_path_buf.push(room_data.token.as_str());
@@ -64,7 +57,7 @@ impl NCRoom {
 
         if path.exists() {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
-                read_to_string(path).unwrap().as_str(),
+                std::fs::read_to_string(path).unwrap().as_str(),
             ) {
                 messages.extend(data.into_iter().map(Into::into));
             } else {
@@ -100,7 +93,7 @@ impl NCRoom {
         })
     }
 
-    pub async fn send(&self, message: String) -> Result<String, Box<dyn Error>> {
+    pub async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>> {
         log::debug!("Send Message {}", &message);
         let response = self
             .requester
@@ -115,7 +108,7 @@ impl NCRoom {
     pub async fn update(
         &mut self,
         data_option: Option<&NCReqDataRoom>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
@@ -161,7 +154,7 @@ impl NCRoom {
             .map(|message| message.get_id())
     }
 
-    pub async fn mark_as_read(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
             self.requester
                 .mark_chat_read(
@@ -193,7 +186,9 @@ impl NCRoom {
         &mut self,
         message_id: i32,
         data_option: Option<&NCReqDataRoom>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::cmp::Ordering;
+
         if let Some(last_internal_id) = self.get_last_room_level_message_id() {
             match message_id.cmp(&last_internal_id) {
                 Ordering::Greater => {
@@ -228,10 +223,12 @@ impl NCRoom {
     }
 
     pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+        use std::io::Write;
+
         let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
         let path = self.path_to_log.as_path();
         // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = match File::create(path) {
+        let mut file = match std::fs::File::create(path) {
             Err(why) => {
                 log::warn!(
                     "Couldn't create log file {} for {}: {}",
@@ -266,13 +263,13 @@ impl NCRoom {
 }
 
 impl Ord for NCRoom {
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.to_string().cmp(other)
     }
 }
 
 impl PartialOrd for NCRoom {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }

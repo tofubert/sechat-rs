@@ -2,6 +2,7 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+use crate::config;
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
 use reqwest::{
@@ -9,17 +10,14 @@ use reqwest::{
     Client, Response, Url,
 };
 use serde::{Deserialize, Deserializer, Serialize};
-use std::path::PathBuf;
-use std::{collections::HashMap, error::Error, fs::File, io::Write};
-
-use crate::config;
+use std::{collections::HashMap, error::Error};
 
 #[derive(Debug, Clone)]
 pub struct NCRequest {
     base_url: String,
     client: Client,
     base_headers: HeaderMap,
-    json_dump_path: Option<PathBuf>,
+    json_dump_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -247,6 +245,8 @@ pub struct NCReqOCS<T> {
 
 impl NCRequest {
     pub fn new() -> Result<NCRequest, Box<dyn Error>> {
+        use std::io::Write;
+
         let config = &config::get();
         let general = &config.data.general;
 
@@ -542,12 +542,14 @@ impl NCRequest {
     }
 
     fn dump_json_to_log(&self, url: &str, text: &str) -> Result<(), Box<dyn Error>> {
+        use std::io::Write;
+
         if let Some(path) = &self.json_dump_path {
             let name: String = url
                 .chars()
                 .map(|ch| if ch == '/' { '_' } else { ch })
                 .collect();
-            let mut file = File::create(name)?;
+            let mut file = std::fs::File::create(name)?;
             let pretty_text = jzon::stringify_pretty(jzon::parse(text)?, 2);
             file.write_all(pretty_text.as_bytes())?;
         }
