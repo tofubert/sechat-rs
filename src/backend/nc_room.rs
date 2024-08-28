@@ -66,9 +66,7 @@ impl NCRoom {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
                 read_to_string(path).unwrap().as_str(),
             ) {
-                for message in data {
-                    messages.push(message.into());
-                }
+                messages.extend(data.into_iter().map(Into::into));
             } else {
                 log::debug!(
                     "Failed to parse json for {}, falling back to fetching",
