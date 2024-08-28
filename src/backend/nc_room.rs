@@ -230,11 +230,8 @@ impl NCRoom {
     }
 
     pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
-        let mut data = Vec::<NCReqDataMessage>::new();
+        let data: Vec<_> = self.messages.iter().map(NCMessage::clone_data).collect();
         let path = self.path_to_log.as_path();
-        for message in &mut self.messages {
-            data.push(message.to_data());
-        }
         // Open a file in write-only mode, returns `io::Result<File>`
         let mut file = match File::create(path) {
             Err(why) => {

@@ -42,7 +42,7 @@ impl NCMessage {
         self.0.id
     }
 
-    pub fn to_data(&self) -> NCReqDataMessage {
+    pub fn clone_data(&self) -> NCReqDataMessage {
         self.0.clone()
     }
 
