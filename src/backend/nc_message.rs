@@ -19,8 +19,8 @@ impl NCMessage {
         time.format("%H:%M").to_string()
     }
 
-    pub fn get_name(&self) -> String {
-        self.0.actorDisplayName.clone()
+    pub fn get_name(&self) -> &str {
+        &self.0.actorDisplayName
     }
 
     pub fn get_message(&self) -> &str {

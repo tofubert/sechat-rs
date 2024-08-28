@@ -46,7 +46,7 @@ impl<'a> ChatBox<'a> {
             })
         {
             let name = textwrap::wrap(
-                &message_data.get_name(),
+                message_data.get_name(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
             )
             .into_iter()
