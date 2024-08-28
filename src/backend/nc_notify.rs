@@ -4,8 +4,7 @@ use notify_rust::{Hint, Notification, Timeout};
 #[derive(Debug, Clone, Default)]
 pub struct NCNotify {
     app_name: String,
-    timeout_ms: u32,
-    persistent: bool,
+    timeout: Timeout,
     silent: bool,
 }
 
@@ -14,8 +13,11 @@ impl NCNotify {
         let data = &config::get().data;
         NCNotify {
             app_name: data.general.chat_server_name.clone(),
-            timeout_ms: data.notifications.timeout_ms,
-            persistent: data.notifications.persistent,
+            timeout: if data.notifications.persistent {
+                Timeout::Never
+            } else {
+                Timeout::Milliseconds(data.notifications.timeout_ms)
+            },
             silent: data.notifications.silent,
         }
     }
@@ -33,14 +35,12 @@ impl NCNotify {
             .icon("dialog-information")
             .appname(&self.app_name)
             .to_owned();
-        if self.persistent {
+        if self.is_persistent() {
             log::debug!("Persistent Message!");
-            notification
-                .hint(Hint::Resident(true)) // this is not supported by all implementations
-                .timeout(Timeout::Never); // this however is
-        } else {
-            notification.timeout(Timeout::Milliseconds(self.timeout_ms));
         }
+        notification
+            .hint(Hint::Resident(self.is_persistent())) // this is not supported by all implementations
+            .timeout(self.timeout);
         notification.hint(Hint::SuppressSound(self.silent));
 
         notification.show()?;
@@ -54,16 +54,17 @@ impl NCNotify {
             .icon("dialog-information")
             .appname(&self.app_name)
             .to_owned();
-        if self.persistent {
-            notification
-                .hint(Hint::Resident(true)) // this is not supported by all implementations
-                .timeout(Timeout::Never); // this however is
-        } else {
-            notification.timeout(Timeout::Milliseconds(self.timeout_ms));
-        }
+        notification
+            .hint(Hint::Resident(self.is_persistent())) // this is not supported by all implementations
+            .timeout(self.timeout); // this however is
         notification.hint(Hint::SuppressSound(self.silent));
 
         notification.show()?;
         Ok(())
+    }
+
+    /// return `true` if notification is persistent (has infinite display timeout)
+    pub fn is_persistent(&self) -> bool {
+        self.timeout == Timeout::Never
     }
 }
