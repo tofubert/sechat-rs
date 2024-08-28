@@ -46,5 +46,9 @@ Use "?" to get to the help screen.
 Please open issues in the issue tracker.
 A list of planned and requested freatures is also kept there.
 
+## The Name
+Originally intended to be called seshat, after the egyptian goddess of writing, a typo became sechat.
+Thank to Sebastian for sugesting the name in the first place. 
+
 ## Sponsors
 Thanks to [emlix gmbh](https://github.com/emlix) for allowing [@tofu](https://github.com/tofubert) and other so spend some of their work time to tinker with this.
