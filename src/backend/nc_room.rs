@@ -14,7 +14,7 @@ use std::{
     path::PathBuf,
 };
 
-#[derive(Debug, FromPrimitive)]
+#[derive(Debug, FromPrimitive, PartialEq)]
 pub enum NCRoomTypes {
     OneToOne = 1,
     Group,

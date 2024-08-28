@@ -250,20 +250,22 @@ impl NCTalk {
     }
 
     pub fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
-        let mut mapping: Vec<(String, String)> = Vec::new();
-        for (key, room) in &self.rooms {
-            match room.room_type {
-                NCRoomTypes::OneToOne | NCRoomTypes::NoteToSelf | NCRoomTypes::ChangeLog => {
-                    mapping.push((key.clone(), self.rooms[key].to_string()));
-                }
-                _ => {}
-            }
-        }
-        mapping.sort_by(|(token_a, _), (token_b, _)| {
-            self.get_room_by_token(token_a)
-                .cmp(self.get_room_by_token(token_b))
-        });
-        mapping
+        self.rooms
+            .iter()
+            .filter(|(_, room)| {
+                [
+                    NCRoomTypes::OneToOne,
+                    NCRoomTypes::NoteToSelf,
+                    NCRoomTypes::ChangeLog,
+                ]
+                .contains(&room.room_type)
+            })
+            .map(|(key, _)| (key.clone(), self.rooms[key].to_string()))
+            .sorted_by(|(token_a, _), (token_b, _)| {
+                self.get_room_by_token(token_a)
+                    .cmp(self.get_room_by_token(token_b))
+            })
+            .collect_vec()
     }
 
     pub fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
