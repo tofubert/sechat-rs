@@ -34,8 +34,6 @@ impl NCMessage {
             .map(|(icon, number)| format!("('{icon}' times {}), ", &number.to_string()))
             .collect::<Vec<_>>()
             .join(", ")
-            // TODO: this was in previous code! is this comma at the end needed?
-            + ", "
     }
 
     pub fn get_id(&self) -> i32 {
