@@ -1,6 +1,7 @@
 use crate::backend::nc_request::NCReqDataMessage;
 use chrono::prelude::*;
 
+/// `NextCloud` message interface
 #[derive(Debug)]
 pub struct NCMessage(NCReqDataMessage);
 
@@ -11,6 +12,7 @@ impl From<NCReqDataMessage> for NCMessage {
 }
 
 impl NCMessage {
+    /// return message time stamp as string
     pub fn get_time_str(&self) -> String {
         let time: DateTime<Local> = DateTime::from(
             DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
@@ -19,14 +21,17 @@ impl NCMessage {
         time.format("%H:%M").to_string()
     }
 
+    /// return opponent display name
     pub fn get_name(&self) -> &str {
         &self.0.actorDisplayName
     }
 
+    /// return the message itself
     pub fn get_message(&self) -> &str {
         &self.0.message
     }
 
+    /// get list of reactions as comma separated string
     pub fn get_reactions_str(&self) -> String {
         self.0
             .reactions
@@ -36,6 +41,7 @@ impl NCMessage {
             .join(", ")
     }
 
+    /// get message identifier
     pub fn get_id(&self) -> i32 {
         self.0.id
     }
@@ -45,30 +51,37 @@ impl NCMessage {
         &self.0
     }
 
+    /// return `true` if message is a comment
     pub fn is_comment(&self) -> bool {
         self.0.messageType == "comment"
     }
 
+    /// return `true` if message is a deleted comment
     pub fn is_comment_deleted(&self) -> bool {
         self.0.messageType == "comment_deleted"
     }
 
+    /// return `true` if message is a system message
     pub fn is_system(&self) -> bool {
         self.0.messageType == "system"
     }
 
+    /// return `true` if message is an edited message
     pub fn is_edit_note(&self) -> bool {
         self.is_system() && self.0.systemMessage == "message_edited"
     }
 
+    /// return `true` if message is a reaction
     pub fn is_reaction(&self) -> bool {
         self.is_system() && self.0.systemMessage == "reaction"
     }
 
+    /// return `true` if message is a command
     pub fn is_command(&self) -> bool {
         self.0.messageType == "command"
     }
 
+    /// return `true` if message has any reactions
     pub fn has_reactions(&self) -> bool {
         !self.0.reactions.is_empty()
     }
