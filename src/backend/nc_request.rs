@@ -4,8 +4,10 @@
 
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
-use reqwest::header::HeaderMap;
-use reqwest::{header, Client, Response, Url};
+use reqwest::{
+    header::{HeaderMap, HeaderValue, AUTHORIZATION},
+    Client, Response, Url,
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::path::PathBuf;
 use std::{collections::HashMap, error::Error, fs::File, io::Write};
@@ -253,12 +255,9 @@ impl NCRequest {
         let base_url = general.url.clone();
 
         let json_dump_path = config.get_http_dump_dir();
-        let mut headers = header::HeaderMap::new();
-        headers.insert("OCS-APIRequest", header::HeaderValue::from_static("true"));
-        headers.insert(
-            "Accept",
-            header::HeaderValue::from_static("application/json"),
-        );
+        let mut headers = HeaderMap::new();
+        headers.insert("OCS-APIRequest", HeaderValue::from_static("true"));
+        headers.insert("Accept", HeaderValue::from_static("application/json"));
 
         let mut buf = b"Basic ".to_vec();
         {
@@ -269,9 +268,9 @@ impl NCRequest {
             }
         }
         let mut auth_value =
-            header::HeaderValue::from_bytes(&buf).expect("base64 is always valid HeaderValue");
+            HeaderValue::from_bytes(&buf).expect("base64 is always valid HeaderValue");
         auth_value.set_sensitive(true);
-        headers.insert(header::AUTHORIZATION, auth_value);
+        headers.insert(AUTHORIZATION, auth_value);
 
         // get a client builder
         let client = reqwest::Client::builder()
