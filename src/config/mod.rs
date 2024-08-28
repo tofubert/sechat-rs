@@ -212,12 +212,12 @@ mod tests {
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
     )]
     fn init_with_faulty_path() {
-        init("/test");
+        init("/bogus_test/path");
     }
 
     #[test]
     fn default_values() {
-        init("./tests/");
+        init("./test/");
         assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
         assert!(get()
             .get_server_data_dir()
