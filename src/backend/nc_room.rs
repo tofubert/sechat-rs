@@ -191,17 +191,17 @@ impl NCRoom {
 
     pub async fn update_if_id_is_newer(
         &mut self,
-        messageid: i32,
+        message_id: i32,
         data_option: Option<&NCReqDataRoom>,
     ) -> Result<(), Box<dyn Error>> {
         if let Some(last_internal_id) = self.get_last_room_level_message_id() {
-            match messageid.cmp(&last_internal_id) {
+            match message_id.cmp(&last_internal_id) {
                 Ordering::Greater => {
                     log::info!(
                         "New Messages for '{}' was {} now {}",
                         self.to_string(),
                         last_internal_id,
-                        messageid
+                        message_id
                     );
                     self.update(data_option).await?;
                 }
@@ -210,7 +210,7 @@ impl NCRoom {
                         "Message Id was older than message stored '{}'! Stored {} Upstream {}",
                         self.to_string(),
                         last_internal_id,
-                        messageid
+                        message_id
                     );
                 }
                 Ordering::Equal => (),

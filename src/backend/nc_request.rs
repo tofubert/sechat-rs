@@ -32,7 +32,7 @@ pub struct NCReqMeta {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessageParameter {
     #[serde(rename = "type")]
-    paramtype: String,
+    param_type: String,
     id: String,
     name: String,
 }
