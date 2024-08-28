@@ -3,7 +3,6 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
 };
-use std::{convert::TryInto, error::Error};
 use textwrap::Options;
 
 // this fits my name, so 20 it is :D
@@ -38,6 +37,7 @@ impl<'a> ChatBox<'a> {
 
     pub fn update_messages(&mut self, backend: &NCTalk) {
         use itertools::Itertools;
+        use std::convert::TryInto;
 
         self.messages.clear();
         for message_data in
@@ -128,7 +128,7 @@ impl<'a> ChatBox<'a> {
             .clamp(0, self.messages.len() - 1);
         self.state.select(Some(self.current_index));
     }
-    pub fn select_line(&mut self, position: Position) -> Result<(), Box<dyn Error>> {
+    pub fn select_line(&mut self, position: Position) -> Result<(), Box<dyn std::error::Error>> {
         log::debug!(
             "Got Position {:?} and selected {:?}",
             position,
