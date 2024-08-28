@@ -1,7 +1,7 @@
 use crate::config::{self};
 use notify_rust::{Hint, Notification, Timeout};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NCNotify {
     app_name: String,
     timeout_ms: u32,
@@ -62,11 +62,5 @@ impl NCNotify {
 
         notification.show()?;
         Ok(())
-    }
-}
-
-impl Default for NCNotify {
-    fn default() -> Self {
-        Self::new()
     }
 }
