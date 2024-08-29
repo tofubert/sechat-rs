@@ -15,7 +15,7 @@ pub struct Config {
     strategy: Xdg,
 }
 
-pub fn init(path_arg: &str) {
+pub fn init(path_arg: &str) -> Result<(), Box<dyn std::error::Error>> {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "org".to_string(),
         author: "emlix".to_string(),
@@ -70,7 +70,7 @@ pub fn init(path_arg: &str) {
                     .expect("Failed to make config path into string")
             );
             Data::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
-            exit(-1);
+            return Err(Box::new(why));
         }
     };
 
@@ -81,6 +81,7 @@ pub fn init(path_arg: &str) {
         .set(config)
         .map_err(|config| eyre!("failed to set config {config:?}"))
         .expect("Could not set global config!");
+    Ok(())
 }
 
 /// Get the application configuration.
@@ -212,12 +213,12 @@ mod tests {
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
     )]
     fn init_with_faulty_path() {
-        init("/bogus_test/path");
+        assert!(init("/bogus_test/path").is_err());
     }
 
     #[test]
     fn default_values() {
-        init("./test/");
+        assert!(init("./test/").is_ok());
         assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
         assert!(get()
             .get_server_data_dir()

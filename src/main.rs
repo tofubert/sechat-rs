@@ -17,7 +17,7 @@ struct Args {
 async fn main() {
     let args = Args::parse();
 
-    config::init(&args.config_path);
+    config::init(&args.config_path).expect("Config init aborted.");
     config::get().config_logging();
 
     // check if crate has alpha suffix in version
