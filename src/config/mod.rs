@@ -31,8 +31,7 @@ pub fn init(path_arg: &str) {
         );
         path_arg.into()
     };
-    let mut config_path = config_path_base.clone();
-    config_path.push("config.toml");
+    let config_path = config_path_base.join("config.toml");
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
@@ -60,8 +59,7 @@ pub fn init(path_arg: &str) {
         Ok(good_data) => good_data,
         Err(why) => {
             println!("Please Update your config {why} ");
-            let mut example_config_path = config_path_base.clone();
-            example_config_path.push("config.toml_new");
+            let example_config_path = config_path_base.join("config.toml_new");
             println!(
                 "Writing example config to {}",
                 example_config_path
@@ -127,8 +125,10 @@ impl Config {
         self.strategy.data_dir()
     }
     pub fn get_server_data_dir(&self) -> PathBuf {
-        let mut path = self.strategy.data_dir();
-        path.push(self.data.general.chat_server_name.clone());
+        let path = self
+            .strategy
+            .data_dir()
+            .join(self.data.general.chat_server_name.clone());
         if !path.exists() {
             std::fs::create_dir_all(path.clone()).expect("Failed to create server data path");
         }
@@ -154,8 +154,7 @@ impl Config {
             filter::threshold::ThresholdFilter,
         };
 
-        let mut log_path = self.strategy.data_dir().clone();
-        log_path.push("app.log");
+        let log_path = self.strategy.data_dir().join("app.log");
 
         // Build a stderr logger.
         let stderr = ConsoleAppender::builder()
