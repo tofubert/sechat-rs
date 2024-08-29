@@ -31,14 +31,13 @@ pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
         );
         path_arg.into()
     };
-    let mut config_path = config_path_base.clone();
-    config_path.push("config.toml");
+    let config_path = config_path_base.join("config.toml");
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
     if !config_path.exists() {
         println!(
-            "Config files doesnt exist creating default now at {}.",
+            "Config files doesn't exist creating default now at {}.",
             config_path
                 .as_os_str()
                 .to_str()
@@ -60,8 +59,7 @@ pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
         Ok(good_data) => good_data,
         Err(why) => {
             println!("Please Update your config {why} ");
-            let mut example_config_path = config_path_base.clone();
-            example_config_path.push("config.toml_new");
+            let example_config_path = config_path_base.join("config.toml_new");
             println!(
                 "Writing example config to {}",
                 example_config_path
@@ -126,8 +124,10 @@ impl Config {
         self.strategy.data_dir()
     }
     pub fn get_server_data_dir(&self) -> PathBuf {
-        let mut path = self.strategy.data_dir();
-        path.push(self.data.general.chat_server_name.clone());
+        let path = self
+            .strategy
+            .data_dir()
+            .join(self.data.general.chat_server_name.clone());
         if !path.exists() {
             std::fs::create_dir_all(path.clone()).expect("Failed to create server data path");
         }
@@ -153,8 +153,7 @@ impl Config {
             filter::threshold::ThresholdFilter,
         };
 
-        let mut log_path = self.strategy.data_dir().clone();
-        log_path.push("app.log");
+        let log_path = self.strategy.data_dir().join("app.log");
 
         // Build a stderr logger.
         let stderr = ConsoleAppender::builder()
@@ -163,7 +162,7 @@ impl Config {
             .build();
 
         // Logging to log file.
-        let logfile = FileAppender::builder()
+        let log_file = FileAppender::builder()
             // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
             .encoder(Box::new(PatternEncoder::new(
                 "{d(%H:%M:%S)} {l} {M}: {m}{n}",
@@ -184,7 +183,7 @@ impl Config {
         let mut root = Root::builder().appender("stderr");
         if self.data.general.log_to_file {
             config_builder =
-                config_builder.appender(Appender::builder().build("logfile", Box::new(logfile)));
+                config_builder.appender(Appender::builder().build("logfile", Box::new(log_file)));
             root = root.appender("logfile");
         }
         let config = config_builder
