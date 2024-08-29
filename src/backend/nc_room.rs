@@ -6,15 +6,8 @@ use super::{
 use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
-use std::{
-    cmp::Ordering,
-    error::Error,
-    fs::{read_to_string, File},
-    io::prelude::*,
-    path::PathBuf,
-};
 
-#[derive(Debug, FromPrimitive)]
+#[derive(Debug, FromPrimitive, PartialEq)]
 pub enum NCRoomTypes {
     OneToOne = 1,
     Group,
@@ -30,20 +23,18 @@ pub struct NCRoom {
     notifier: NCNotify,
     pub messages: Vec<NCMessage>,
     room_data: NCReqDataRoom,
-    path_to_log: PathBuf,
+    path_to_log: std::path::PathBuf,
     pub room_type: NCRoomTypes,
     participants: Vec<NCReqDataParticipants>,
 }
 
 impl NCRoom {
     async fn fetch_messages(
-        requester: NCRequest,
-        token: String,
+        requester: &NCRequest,
+        token: &str,
         messages: &mut Vec<NCMessage>,
-    ) -> Result<(), Box<dyn Error>> {
-        let response = requester
-            .fetch_chat_initial(token.clone().as_str(), 200)
-            .await?;
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let response = requester.fetch_chat_initial(token, 200).await?;
         for message in response {
             messages.push(message.into());
         }
@@ -54,7 +45,7 @@ impl NCRoom {
         room_data: NCReqDataRoom,
         requester: NCRequest,
         notifier: NCNotify,
-        path_to_log: PathBuf,
+        path_to_log: std::path::PathBuf,
     ) -> Option<NCRoom> {
         let mut tmp_path_buf = path_to_log.clone();
         tmp_path_buf.push(room_data.token.as_str());
@@ -64,28 +55,25 @@ impl NCRoom {
 
         if path.exists() {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
-                read_to_string(path).unwrap().as_str(),
+                std::fs::read_to_string(path).unwrap().as_str(),
             ) {
-                for message in data {
-                    messages.push(message.into());
-                }
+                messages.extend(data.into_iter().map(Into::into));
             } else {
                 log::debug!(
                     "Failed to parse json for {}, falling back to fetching",
                     room_data.displayName
                 );
-                NCRoom::fetch_messages(requester.clone(), room_data.token.clone(), &mut messages)
+                NCRoom::fetch_messages(&requester, &room_data.token, &mut messages)
                     .await
                     .ok();
             }
         } else {
             log::debug!("No Log File found for room {}", room_data.displayName);
-            NCRoom::fetch_messages(requester.clone(), room_data.token.clone(), &mut messages)
+            NCRoom::fetch_messages(&requester, &room_data.token, &mut messages)
                 .await
                 .ok();
         }
 
-        let type_num = room_data.roomtype;
         let participants = requester
             .fetch_participants(&room_data.token)
             .await
@@ -94,15 +82,15 @@ impl NCRoom {
         Some(NCRoom {
             requester,
             notifier,
-            room_data,
             messages,
             path_to_log: tmp_path_buf,
-            room_type: FromPrimitive::from_i32(type_num).unwrap(),
+            room_type: FromPrimitive::from_i32(room_data.roomtype).unwrap(),
             participants,
+            room_data,
         })
     }
 
-    pub async fn send(&self, message: String) -> Result<String, Box<dyn Error>> {
+    pub async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>> {
         log::debug!("Send Message {}", &message);
         let response = self
             .requester
@@ -117,14 +105,14 @@ impl NCRoom {
     pub async fn update(
         &mut self,
         data_option: Option<&NCReqDataRoom>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
         let response = self
             .requester
             .fetch_chat_update(
-                self.room_data.token.clone().as_str(),
+                self.room_data.token.as_str(),
                 200,
                 self.messages.last().unwrap().get_id(),
             )
@@ -163,7 +151,7 @@ impl NCRoom {
             .map(|message| message.get_id())
     }
 
-    pub async fn mark_as_read(&self) -> Result<(), Box<dyn Error>> {
+    pub async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
             self.requester
                 .mark_chat_read(
@@ -193,17 +181,19 @@ impl NCRoom {
 
     pub async fn update_if_id_is_newer(
         &mut self,
-        messageid: i32,
+        message_id: i32,
         data_option: Option<&NCReqDataRoom>,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::cmp::Ordering;
+
         if let Some(last_internal_id) = self.get_last_room_level_message_id() {
-            match messageid.cmp(&last_internal_id) {
+            match message_id.cmp(&last_internal_id) {
                 Ordering::Greater => {
                     log::info!(
                         "New Messages for '{}' was {} now {}",
                         self.to_string(),
                         last_internal_id,
-                        messageid
+                        message_id
                     );
                     self.update(data_option).await?;
                 }
@@ -212,7 +202,7 @@ impl NCRoom {
                         "Message Id was older than message stored '{}'! Stored {} Upstream {}",
                         self.to_string(),
                         last_internal_id,
-                        messageid
+                        message_id
                     );
                 }
                 Ordering::Equal => (),
@@ -230,13 +220,12 @@ impl NCRoom {
     }
 
     pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
-        let mut data = Vec::<NCReqDataMessage>::new();
+        use std::io::Write;
+
+        let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
         let path = self.path_to_log.as_path();
-        for message in &mut self.messages {
-            data.push(message.to_data());
-        }
         // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = match File::create(path) {
+        let mut file = match std::fs::File::create(path) {
             Err(why) => {
                 log::warn!(
                     "Couldn't create log file {} for {}: {}",
@@ -271,13 +260,13 @@ impl NCRoom {
 }
 
 impl Ord for NCRoom {
-    fn cmp(&self, other: &Self) -> Ordering {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.to_string().cmp(other)
     }
 }
 
 impl PartialOrd for NCRoom {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }

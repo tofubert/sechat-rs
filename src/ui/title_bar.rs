@@ -4,7 +4,6 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
 };
-use std::string::ToString;
 use style::Styled;
 
 pub struct TitleBar<'a> {

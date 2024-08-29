@@ -7,32 +7,26 @@ pub mod title_bar;
 
 use super::{
     backend::nc_talk::NCTalk,
-    config::{self},
+    config,
     ui::app::{App, CurrentScreen},
 };
 use cfg_if::cfg_if;
 use color_eyre::{
     config::{EyreHook, HookBuilder, PanicHook},
-    eyre::{self, Result},
+    eyre,
 };
 use crossterm::{
     event::{
-        self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind,
+        poll, read, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste,
+        EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
-use std::{
-    error::Error,
-    io::{stdout, Stdout},
-    panic,
-    time::Duration,
-};
 use tracing::error;
 
-pub fn install_hooks() -> Result<()> {
+pub fn install_hooks() -> eyre::Result<()> {
     let (panic_hook, eyre_hook) = HookBuilder::default()
         .panic_section(format!(
             "This is a bug. Consider reporting it at {}",
@@ -68,7 +62,7 @@ fn install_color_eyre_panic_hook(panic_hook: PanicHook) {
     // convert from a `color_eyre::config::PanicHook`` to a `Box<dyn
     // Fn(&PanicInfo<'_>`
     let panic_hook = panic_hook.into_panic_hook();
-    panic::set_hook(Box::new(move |panic_info| {
+    std::panic::set_hook(Box::new(move |panic_info| {
         if let Err(err) = restore() {
             error!("Unable to restore terminal: {err:?}");
         }
@@ -89,9 +83,11 @@ fn install_eyre_hook(eyre_hook: EyreHook) -> color_eyre::Result<()> {
     Ok(())
 }
 
-pub type Tui = Terminal<CrosstermBackend<Stdout>>;
+pub type Tui = Terminal<CrosstermBackend<std::io::Stdout>>;
 
-pub fn init() -> Result<Tui> {
+pub fn init() -> eyre::Result<Tui> {
+    use std::io::stdout;
+
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
     if config::get().get_enable_mouse() {
@@ -106,7 +102,9 @@ pub fn init() -> Result<Tui> {
     Ok(terminal)
 }
 
-pub fn restore() -> Result<()> {
+pub fn restore() -> eyre::Result<()> {
+    use std::io::stdout;
+
     if config::get().get_enable_paste() {
         execute!(stdout(), DisableBracketedPaste)?;
     }
@@ -123,7 +121,7 @@ enum ProcessEventResult {
     Exit,
 }
 
-pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn Error>> {
+pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn std::error::Error>> {
     install_hooks()?;
 
     // create app and run it
@@ -140,15 +138,15 @@ pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn Error>> {
 async fn run_app<B: Backend>(
     mut terminal: Terminal<B>,
     mut app: App<'_>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     app.select_room().await?;
     log::debug!("Entering Main Loop");
     loop {
         terminal.draw(|f| app.ui(f))?;
 
         // Event within timeout?
-        if event::poll(Duration::from_millis(3000))? {
-            match process_event(&mut app, event::read()?).await {
+        if poll(std::time::Duration::from_millis(3000))? {
+            match process_event(&mut app, read()?).await {
                 Ok(ProcessEventResult::Continue) => (),
                 Ok(ProcessEventResult::Exit) => return Ok(()),
                 Err(why) => return Err(why),
@@ -164,11 +162,11 @@ async fn run_app<B: Backend>(
 async fn process_event(
     app: &mut App<'_>,
     event: Event,
-) -> Result<ProcessEventResult, Box<dyn Error>> {
+) -> Result<ProcessEventResult, Box<dyn std::error::Error>> {
     // It's guaranteed that `read` won't block, because `poll` returned
     // `Ok(true)`.
     match event {
-        Event::Key(key) if key.kind != event::KeyEventKind::Release => {
+        Event::Key(key) if key.kind != KeyEventKind::Release => {
             log::debug!("Processing key event {:?}", key.code);
             match app.current_screen {
                 CurrentScreen::Helping => handle_key_in_help(key, app),
@@ -196,9 +194,9 @@ async fn process_event(
 }
 
 async fn handle_key_in_opening(
-    key: event::KeyEvent,
+    key: KeyEvent,
     app: &mut App<'_>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
         KeyCode::Char('h') | KeyCode::Left => _ = app.selector.state.key_left(),
@@ -219,9 +217,9 @@ async fn handle_key_in_opening(
 }
 
 async fn handle_key_in_editing(
-    key: event::KeyEvent,
+    key: KeyEvent,
     app: &mut App<'_>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     if key.kind == KeyEventKind::Press {
         match key.code {
             KeyCode::Enter => {
@@ -239,7 +237,7 @@ async fn handle_key_in_editing(
     Ok(())
 }
 
-fn handle_key_in_help(key: event::KeyEvent, app: &mut App) {
+fn handle_key_in_help(key: KeyEvent, app: &mut App) {
     match key.code {
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
@@ -249,9 +247,9 @@ fn handle_key_in_help(key: event::KeyEvent, app: &mut App) {
 }
 
 fn handle_key_in_exit(
-    key: event::KeyEvent,
+    key: KeyEvent,
     app: &mut App,
-) -> Option<Result<ProcessEventResult, Box<dyn Error>>> {
+) -> Option<Result<ProcessEventResult, Box<dyn std::error::Error>>> {
     match key.code {
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
         KeyCode::Char('y') => {
@@ -270,9 +268,9 @@ fn handle_key_in_exit(
 }
 
 async fn handle_key_in_reading(
-    key: event::KeyEvent,
+    key: KeyEvent,
     app: &mut App<'_>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.current_screen = CurrentScreen::Exiting;

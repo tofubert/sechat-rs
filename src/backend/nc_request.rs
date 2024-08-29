@@ -2,22 +2,22 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+use crate::config;
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
-use reqwest::header::HeaderMap;
-use reqwest::{header, Client, Response, Url};
+use reqwest::{
+    header::{HeaderMap, HeaderValue, AUTHORIZATION},
+    Client, Response, Url,
+};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::path::PathBuf;
-use std::{collections::HashMap, error::Error, fs::File, io::Write};
-
-use crate::config;
+use std::{collections::HashMap, error::Error};
 
 #[derive(Debug, Clone)]
 pub struct NCRequest {
     base_url: String,
     client: Client,
     base_headers: HeaderMap,
-    json_dump_path: Option<PathBuf>,
+    json_dump_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -30,7 +30,7 @@ pub struct NCReqMeta {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessageParameter {
     #[serde(rename = "type")]
-    paramtype: String,
+    param_type: String,
     id: String,
     name: String,
 }
@@ -245,29 +245,32 @@ pub struct NCReqOCS<T> {
 
 impl NCRequest {
     pub fn new() -> Result<NCRequest, Box<dyn Error>> {
-        let username = config::get().data.general.user.clone();
-        let password = Some(config::get().data.general.app_pw.clone());
-        let base_url = config::get().data.general.url.clone();
-        let json_dump_path = config::get().get_http_dump_dir();
-        let mut headers = header::HeaderMap::new();
-        headers.insert("OCS-APIRequest", header::HeaderValue::from_static("true"));
-        headers.insert(
-            "Accept",
-            header::HeaderValue::from_static("application/json"),
-        );
+        use std::io::Write;
+
+        let config = &config::get();
+        let general = &config.data.general;
+
+        let username = general.user.clone();
+        let password = Some(general.app_pw.clone());
+        let base_url = general.url.clone();
+
+        let json_dump_path = config.get_http_dump_dir();
+        let mut headers = HeaderMap::new();
+        headers.insert("OCS-APIRequest", HeaderValue::from_static("true"));
+        headers.insert("Accept", HeaderValue::from_static("application/json"));
 
         let mut buf = b"Basic ".to_vec();
         {
             let mut encoder = EncoderWriter::new(&mut buf, &BASE64_STANDARD);
-            let _ = write!(encoder, "{username}:");
+            write!(encoder, "{username}:").expect("i/o error");
             if let Some(password) = password {
-                let _ = write!(encoder, "{password}");
+                write!(encoder, "{password}").expect("i/o error");
             }
         }
         let mut auth_value =
-            header::HeaderValue::from_bytes(&buf).expect("base64 is always valid HeaderValue");
+            HeaderValue::from_bytes(&buf).expect("base64 is always valid HeaderValue");
         auth_value.set_sensitive(true);
-        headers.insert(header::AUTHORIZATION, auth_value);
+        headers.insert(AUTHORIZATION, auth_value);
 
         // get a client builder
         let client = reqwest::Client::builder()
@@ -288,8 +291,7 @@ impl NCRequest {
         token: &str,
     ) -> Result<NCReqDataMessage, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
-        let mut params = HashMap::new();
-        params.insert("message".to_owned(), message.clone());
+        let params = HashMap::from([("message", message)]);
         let url = Url::parse_with_params(&url_string, params)?;
         let response = self.request_post(url).await?;
 
@@ -313,13 +315,10 @@ impl NCRequest {
         name: &str,
     ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/core/autocomplete/get";
-        let mut params = HashMap::new();
-        params.insert("limit".to_owned(), "200".to_string());
-        params.insert("search".to_owned(), name.to_string());
-
+        let params = HashMap::from([("limit", "200"), ("search", name)]);
         let url = Url::parse_with_params(&url_string, params)?;
-
         let response = self.request(url).await?;
+
         match response.status() {
             reqwest::StatusCode::OK => {
                 let text = response.text().await?;
@@ -349,8 +348,7 @@ impl NCRequest {
             + "/ocs/v2.php/apps/spreed/api/v4/room/"
             + token
             + "/participants";
-        let mut params = HashMap::new();
-        params.insert("includeStatus".to_owned(), "true".to_string());
+        let params = HashMap::from([("includeStatus", "true")]);
         let url = Url::parse_with_params(&url_string, params)?;
 
         let response = self.request(url).await?;
@@ -391,10 +389,11 @@ impl NCRequest {
         last_timestamp: Option<i64>,
     ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v4/room";
-        let mut params = HashMap::new();
-        if let Some(timestamp) = last_timestamp {
-            params.insert("modifiedSince".to_owned(), timestamp.to_string());
-        }
+        let params = if let Some(timestamp) = last_timestamp {
+            HashMap::from([("modifiedSince", timestamp.to_string())])
+        } else {
+            HashMap::new()
+        };
         let url = Url::parse_with_params(&url_string, &params)?;
         let response = self.request(url).await?;
         match response.status() {
@@ -463,18 +462,23 @@ impl NCRequest {
         last_message: Option<i32>,
     ) -> Result<Option<Vec<NCReqDataMessage>>, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
-        let mut params = HashMap::new();
-        params.insert("limit".to_owned(), maxMessage.to_string());
-        params.insert("setReadMarker".to_owned(), "0".to_owned());
-        if let Some(lastId) = last_message {
+        let params = if let Some(lastId) = last_message {
             log::debug!("Last MessageID {}", lastId);
-            params.insert("lastKnownMessageId".to_owned(), lastId.to_string());
-            params.insert("lookIntoFuture".to_owned(), "1".to_owned());
-            params.insert("timeout".to_owned(), "0".to_owned());
-            params.insert("includeLastKnown".to_owned(), "0".to_owned());
+            HashMap::from([
+                ("limit", maxMessage.to_string()),
+                ("setReadMarker", "0".into()),
+                ("lookIntoFuture", "1".into()),
+                ("lastKnownMessageId", lastId.to_string()),
+                ("timeout", "0".into()),
+                ("includeLastKnown", "0".into()),
+            ])
         } else {
-            params.insert("lookIntoFuture".to_owned(), "0".to_owned());
-        }
+            HashMap::from([
+                ("limit", maxMessage.to_string()),
+                ("setReadMarker", "0".into()),
+                ("lookIntoFuture", "0".into()),
+            ])
+        };
         let url = Url::parse_with_params(&url_string, &params)?;
         let response = self.request(url).await?;
         match response.status() {
@@ -538,10 +542,14 @@ impl NCRequest {
     }
 
     fn dump_json_to_log(&self, url: &str, text: &str) -> Result<(), Box<dyn Error>> {
+        use std::io::Write;
+
         if let Some(path) = &self.json_dump_path {
-            let mut name = path.clone();
-            name.push(url.replace('/', "_"));
-            let mut file = File::create(name)?;
+            let name: String = url
+                .chars()
+                .map(|ch| if ch == '/' { '_' } else { ch })
+                .collect();
+            let mut file = std::fs::File::create(name)?;
             let pretty_text = jzon::stringify_pretty(jzon::parse(text)?, 2);
             file.write_all(pretty_text.as_bytes())?;
         }
