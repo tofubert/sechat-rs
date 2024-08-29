@@ -30,13 +30,11 @@ pub struct NCRoom {
 
 impl NCRoom {
     async fn fetch_messages(
-        requester: NCRequest,
-        token: String,
+        requester: &NCRequest,
+        token: &str,
         messages: &mut Vec<NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let response = requester
-            .fetch_chat_initial(token.clone().as_str(), 200)
-            .await?;
+        let response = requester.fetch_chat_initial(token, 200).await?;
         for message in response {
             messages.push(message.into());
         }
@@ -65,13 +63,13 @@ impl NCRoom {
                     "Failed to parse json for {}, falling back to fetching",
                     room_data.displayName
                 );
-                NCRoom::fetch_messages(requester.clone(), room_data.token.clone(), &mut messages)
+                NCRoom::fetch_messages(&requester, &room_data.token, &mut messages)
                     .await
                     .ok();
             }
         } else {
             log::debug!("No Log File found for room {}", room_data.displayName);
-            NCRoom::fetch_messages(requester.clone(), room_data.token.clone(), &mut messages)
+            NCRoom::fetch_messages(&requester, &room_data.token, &mut messages)
                 .await
                 .ok();
         }
@@ -114,7 +112,7 @@ impl NCRoom {
         let response = self
             .requester
             .fetch_chat_update(
-                self.room_data.token.clone().as_str(),
+                self.room_data.token.as_str(),
                 200,
                 self.messages.last().unwrap().get_id(),
             )
