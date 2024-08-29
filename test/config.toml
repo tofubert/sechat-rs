@@ -38,6 +38,9 @@ categories = [ "", ]
 
 categories_separator = ""
 
+# Should the userlist be shown in rooms by default?
+user_sidebar_default = true
+
 use_mouse = true
 
 use_paste = true
