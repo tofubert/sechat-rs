@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use crate::{
     backend::{
         nc_notify::NCNotify,
@@ -9,13 +7,8 @@ use crate::{
     config::{self},
 };
 use core::panic;
-use std::{
-    collections::HashMap,
-    error::Error,
-    fs::{read_to_string, File},
-    io::prelude::*,
-    path::PathBuf,
-};
+use itertools::Itertools;
+use std::{collections::HashMap, error::Error, path::PathBuf};
 
 #[derive(Debug)]
 pub struct NCTalk {
@@ -35,15 +28,14 @@ impl NCTalk {
         rooms: &mut HashMap<String, NCRoom>,
         chat_log_path: PathBuf,
     ) {
-        let mut v = Vec::new();
-        for child in response {
-            v.push(tokio::spawn(NCTalk::new_room(
+        let v = response.into_iter().map(|child| {
+            tokio::spawn(NCTalk::new_room(
                 child,
                 requester.clone(),
                 notifier.clone(),
                 chat_log_path.clone(),
-            )));
-        }
+            ))
+        });
         for jh in v {
             let (name, room_option) = jh.await.unwrap();
             if let Some(room) = room_option {
@@ -85,7 +77,7 @@ impl NCTalk {
 
         if path.exists() {
             if let Ok(mut data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
-                read_to_string(path).unwrap().as_str(),
+                std::fs::read_to_string(path).unwrap().as_str(),
             ) {
                 let mut handles = HashMap::new();
                 for (token, room) in &mut data {
@@ -178,6 +170,8 @@ impl NCTalk {
     }
 
     pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+        use std::io::Write;
+
         let mut data = HashMap::<String, NCReqDataRoom>::new();
         let mut tmp_path_buf = self.chat_data_path.clone();
         tmp_path_buf.push("Talk.json");
@@ -187,7 +181,7 @@ impl NCTalk {
             room.write_to_log()?;
         }
         // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = match File::create(path) {
+        let mut file = match std::fs::File::create(path) {
             Err(why) => {
                 log::warn!(
                     "couldn't create top level log file {}: {}",
@@ -251,20 +245,22 @@ impl NCTalk {
     }
 
     pub fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
-        let mut mapping: Vec<(String, String)> = Vec::new();
-        for (key, room) in &self.rooms {
-            match room.room_type {
-                NCRoomTypes::OneToOne | NCRoomTypes::NoteToSelf | NCRoomTypes::ChangeLog => {
-                    mapping.push((key.clone(), self.rooms[key].to_string()));
-                }
-                _ => {}
-            }
-        }
-        mapping.sort_by(|(token_a, _), (token_b, _)| {
-            self.get_room_by_token(token_a)
-                .cmp(self.get_room_by_token(token_b))
-        });
-        mapping
+        self.rooms
+            .iter()
+            .filter(|(_, room)| {
+                [
+                    NCRoomTypes::OneToOne,
+                    NCRoomTypes::NoteToSelf,
+                    NCRoomTypes::ChangeLog,
+                ]
+                .contains(&room.room_type)
+            })
+            .map(|(key, _)| (key.clone(), self.rooms[key].to_string()))
+            .sorted_by(|(token_a, _), (token_b, _)| {
+                self.get_room_by_token(token_a)
+                    .cmp(self.get_room_by_token(token_b))
+            })
+            .collect_vec()
     }
 
     pub fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {

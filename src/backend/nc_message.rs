@@ -1,85 +1,88 @@
 use crate::backend::nc_request::NCReqDataMessage;
 use chrono::prelude::*;
 
+/// `NextCloud` message interface
 #[derive(Debug)]
-pub struct NCMessage {
-    data: NCReqDataMessage,
-    message: String,
-}
+pub struct NCMessage(NCReqDataMessage);
 
 impl From<NCReqDataMessage> for NCMessage {
     fn from(data: NCReqDataMessage) -> Self {
-        NCMessage {
-            message: data.message.clone(),
-            data,
-        }
+        NCMessage(data)
     }
 }
 
 impl NCMessage {
+    /// return message time stamp as string
     pub fn get_time_str(&self) -> String {
-        let time: DateTime<Local> =
-            DateTime::from(DateTime::<Utc>::from_timestamp(self.data.timestamp, 0).unwrap());
+        let time: DateTime<Local> = DateTime::from(
+            DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
+                .expect("cannot convert UTC time stamp"),
+        );
         time.format("%H:%M").to_string()
     }
 
-    pub fn get_name(&self) -> String {
-        self.data.actorDisplayName.clone()
+    /// return opponent display name
+    pub fn get_name(&self) -> &str {
+        &self.0.actorDisplayName
     }
 
-    pub fn get_message(&self) -> String {
-        self.message.clone()
+    /// return the message itself
+    pub fn get_message(&self) -> &str {
+        &self.0.message
     }
 
+    /// get list of reactions as comma separated string
     pub fn get_reactions_str(&self) -> String {
-        let mut reactions = String::new();
-        for (icon, number) in &self.data.reactions {
-            reactions = reactions + "('" + icon + "' times " + &number.to_string() + "), ";
-        }
-        reactions
+        self.0
+            .reactions
+            .iter()
+            .map(|(icon, number)| format!("('{icon}' times {}), ", &number.to_string()))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
+    /// get message identifier
     pub fn get_id(&self) -> i32 {
-        self.data.id
+        self.0.id
     }
 
-    pub fn to_data(&self) -> NCReqDataMessage {
-        self.data.clone()
+    /// return inner data message
+    pub fn data(&self) -> &NCReqDataMessage {
+        &self.0
     }
 
+    /// return `true` if message is a comment
     pub fn is_comment(&self) -> bool {
-        self.data.messageType == "comment"
+        self.0.messageType == "comment"
     }
 
+    /// return `true` if message is a deleted comment
     pub fn is_comment_deleted(&self) -> bool {
-        self.data.messageType == "comment_deleted"
+        self.0.messageType == "comment_deleted"
     }
 
+    /// return `true` if message is a system message
     pub fn is_system(&self) -> bool {
-        self.data.messageType == "system"
+        self.0.messageType == "system"
     }
 
+    /// return `true` if message is an edited message
     pub fn is_edit_note(&self) -> bool {
-        if self.is_system() {
-            self.data.systemMessage == "message_edited"
-        } else {
-            false
-        }
+        self.is_system() && self.0.systemMessage == "message_edited"
     }
 
+    /// return `true` if message is a reaction
     pub fn is_reaction(&self) -> bool {
-        if self.is_system() {
-            self.data.systemMessage == "reaction"
-        } else {
-            false
-        }
+        self.is_system() && self.0.systemMessage == "reaction"
     }
 
+    /// return `true` if message is a command
     pub fn is_command(&self) -> bool {
-        self.data.messageType == "command"
+        self.0.messageType == "command"
     }
 
+    /// return `true` if message has any reactions
     pub fn has_reactions(&self) -> bool {
-        !self.data.reactions.is_empty()
+        !self.0.reactions.is_empty()
     }
 }

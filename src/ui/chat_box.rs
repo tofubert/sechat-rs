@@ -3,7 +3,6 @@ use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
 };
-use std::{convert::TryInto, error::Error};
 use textwrap::Options;
 
 // this fits my name, so 20 it is :D
@@ -38,6 +37,7 @@ impl<'a> ChatBox<'a> {
 
     pub fn update_messages(&mut self, backend: &NCTalk) {
         use itertools::Itertools;
+        use std::convert::TryInto;
 
         self.messages.clear();
         for message_data in
@@ -46,14 +46,13 @@ impl<'a> ChatBox<'a> {
             })
         {
             let name = textwrap::wrap(
-                &message_data.get_name(),
+                message_data.get_name(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
             )
             .into_iter()
             .map(std::borrow::Cow::into_owned)
             .map(Line::from)
             .collect_vec();
-            let mut row_height: u16 = name.len().try_into().unwrap();
 
             let message_string = message_data
                 .get_message()
@@ -66,8 +65,11 @@ impl<'a> ChatBox<'a> {
                         .collect_vec()
                 })
                 .collect_vec();
-            if message_string.len() > row_height as usize {
-                row_height = message_string.len().try_into().unwrap();
+
+            let row_height: u16 = if message_string.len() > name.len() {
+                message_string.len().try_into().expect("message too long")
+            } else {
+                name.len().try_into().expect("name too long")
             };
             let message: Vec<Cell> = vec![
                 message_data.get_time_str().into(),
@@ -126,7 +128,7 @@ impl<'a> ChatBox<'a> {
             .clamp(0, self.messages.len() - 1);
         self.state.select(Some(self.current_index));
     }
-    pub fn select_line(&mut self, position: Position) -> Result<(), Box<dyn Error>> {
+    pub fn select_line(&mut self, position: Position) -> Result<(), Box<dyn std::error::Error>> {
         log::debug!(
             "Got Position {:?} and selected {:?}",
             position,
