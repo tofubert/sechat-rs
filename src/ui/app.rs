@@ -7,6 +7,7 @@ use crate::{
 };
 use ratatui::{prelude::*, widgets::Paragraph};
 use strum_macros::Display;
+use tui_textarea::Input;
 
 #[derive(PartialEq, Clone, Copy, Display)]
 pub enum CurrentScreen {
@@ -23,7 +24,7 @@ pub struct App<'a> {
     title: TitleBar<'a>,
     chat: ChatBox<'a>,
     pub selector: ChatSelector<'a>,
-    input: InputBox,
+    input: InputBox<'a>,
     help: HelpBox,
 }
 
@@ -38,7 +39,7 @@ impl<'a> App<'a> {
                     .to_string(),
             ),
             selector: ChatSelector::new(&backend),
-            input: InputBox::default(),
+            input: InputBox::new(""),
             chat: {
                 let mut chat = ChatBox::new();
                 chat.update_messages(&backend);
@@ -96,11 +97,19 @@ impl<'a> App<'a> {
     }
 
     pub async fn send_message(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.backend.send_message(self.input.to_string()).await?;
-        self.input.clear();
-        self.update_ui()?;
-        self.chat.select_last_message();
-        Ok(())
+        if self.input.is_empty() {
+            Ok(())
+        } else {
+            self.backend
+                .send_message(self.input.lines().join("\n"))
+                .await?;
+            self.input.select_all();
+            self.input.cut();
+            self.input.select_all();
+            self.update_ui()?;
+            self.chat.select_last_message();
+            Ok(())
+        }
     }
 
     pub async fn select_room(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -130,12 +139,8 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub fn pop_input(&mut self) {
-        self.input.pop();
-    }
-
-    pub fn append_input(&mut self, new_input: char) {
-        self.input.push(new_input);
+    pub fn new_input_key(&mut self, key: Input) {
+        self.input.input(key);
     }
 
     pub fn scroll_up(&mut self) {
