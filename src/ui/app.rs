@@ -6,7 +6,6 @@ use crate::{
     },
 };
 use ratatui::{prelude::*, widgets::Paragraph};
-use std::error::Error;
 use strum_macros::Display;
 
 #[derive(PartialEq, Clone, Copy, Display)]
@@ -82,21 +81,21 @@ impl<'a> App<'a> {
         self.title.render_area(f, base_layout[0]);
     }
 
-    pub async fn mark_current_as_read(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn mark_current_as_read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.backend.get_current_room().mark_as_read().await?;
         self.backend.update_rooms(true).await?;
         self.update_ui()?;
         Ok(())
     }
 
-    fn update_ui(&mut self) -> Result<(), Box<dyn Error>> {
+    fn update_ui(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.title.update(self.current_screen, &self.backend);
         self.selector.update(&self.backend)?;
         self.chat.update_messages(&self.backend);
         Ok(())
     }
 
-    pub async fn send_message(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn send_message(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.backend.send_message(self.input.to_string()).await?;
         self.input.clear();
         self.update_ui()?;
@@ -104,7 +103,7 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub async fn select_room(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn select_room(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.selector.state.selected().len() == 2 {
             self.backend
                 .select_room(
@@ -125,7 +124,7 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub async fn fetch_updates(&mut self) -> Result<(), Box<dyn Error>> {
+    pub async fn fetch_updates(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.backend.update_rooms(false).await?;
         self.update_ui()?;
         Ok(())
@@ -147,7 +146,7 @@ impl<'a> App<'a> {
         self.chat.select_down();
     }
 
-    pub fn click_at(&mut self, position: Position) -> Result<(), Box<dyn Error>> {
+    pub fn click_at(&mut self, position: Position) -> Result<(), Box<dyn std::error::Error>> {
         match self.current_screen {
             CurrentScreen::Reading => self.chat.select_line(position)?,
             CurrentScreen::Opening => {
