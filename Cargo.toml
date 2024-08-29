@@ -20,9 +20,6 @@ exclude = [
   "tags",
 ]
 
-[build]
-target = ["x86_64-unknown-linux-gnu", "i686-unknown-linux-gnu"]
-
 [dependencies]
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
