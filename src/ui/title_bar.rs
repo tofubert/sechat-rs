@@ -1,4 +1,7 @@
-use crate::{backend::nc_talk::NCTalk, ui::app::CurrentScreen};
+use crate::{
+    backend::nc_talk::{NCBackend, NCTalk},
+    ui::app::CurrentScreen,
+};
 use num_traits::AsPrimitive;
 use ratatui::{
     prelude::*,

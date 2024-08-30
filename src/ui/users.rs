@@ -4,7 +4,7 @@ use ratatui::{
 };
 use style::Styled;
 
-use crate::backend::nc_talk::NCTalk;
+use crate::backend::nc_talk::{NCBackend, NCTalk};
 
 pub struct Users<'a> {
     user_list: Vec<Row<'a>>,

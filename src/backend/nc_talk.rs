@@ -10,6 +10,21 @@ use core::panic;
 use itertools::Itertools;
 use std::{collections::HashMap, error::Error, path::PathBuf};
 
+pub trait NCBackend {
+    fn write_to_log(&mut self) -> Result<(), std::io::Error>;
+    fn get_current_room(&self) -> &NCRoom;
+    fn get_room_by_token(&self, token: &String) -> &NCRoom;
+    fn get_unread_rooms(&self) -> Vec<String>;
+    fn get_room_by_displayname(&self, name: &String) -> &NCRoom;
+    fn add_room(&mut self, room_option: Option<NCRoom>);
+    fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+    fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+    fn get_room_keys(&self) -> Vec<&String>;
+    async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>>;
+    async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>>;
+    async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
+}
+
 #[derive(Debug)]
 pub struct NCTalk {
     rooms: HashMap<String, NCRoom>,
@@ -57,7 +72,6 @@ impl NCTalk {
             NCRoom::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
-
     pub async fn new(requester: NCRequest) -> Result<NCTalk, Box<dyn Error>> {
         let notify = NCNotify::new();
 
@@ -168,8 +182,9 @@ impl NCTalk {
 
         Ok(talk)
     }
-
-    pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+}
+impl NCBackend for NCTalk {
+    fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
         let mut data = HashMap::<String, NCReqDataRoom>::new();
@@ -212,15 +227,15 @@ impl NCTalk {
         }
     }
 
-    pub fn get_current_room(&self) -> &NCRoom {
+    fn get_current_room(&self) -> &NCRoom {
         &self.rooms[&self.current_room_token]
     }
 
-    pub fn get_room_by_token(&self, token: &String) -> &NCRoom {
+    fn get_room_by_token(&self, token: &String) -> &NCRoom {
         &self.rooms[token]
     }
 
-    pub fn get_unread_rooms(&self) -> Vec<String> {
+    fn get_unread_rooms(&self) -> Vec<String> {
         self.rooms
             .values()
             .filter(|room| room.has_unread() && self.current_room_token != room.to_token())
@@ -229,7 +244,7 @@ impl NCTalk {
             .collect::<Vec<String>>()
     }
 
-    pub fn get_room_by_displayname(&self, name: &String) -> &NCRoom {
+    fn get_room_by_displayname(&self, name: &String) -> &NCRoom {
         for room in self.rooms.values() {
             if room.to_string() == *name {
                 return room;
@@ -238,13 +253,13 @@ impl NCTalk {
         panic!("room doesnt exist {}", name);
     }
 
-    pub fn add_room(&mut self, room_option: Option<NCRoom>) {
+    fn add_room(&mut self, room_option: Option<NCRoom>) {
         if let Some(room) = room_option {
             self.rooms.insert(room.to_token(), room);
         }
     }
 
-    pub fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
+    fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
         self.rooms
             .iter()
             .filter(|(_, room)| {
@@ -263,7 +278,7 @@ impl NCTalk {
             .collect_vec()
     }
 
-    pub fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
+    fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
         let mut mapping: Vec<(String, String)> = Vec::new();
         for (key, room) in &self.rooms {
             match room.room_type {
@@ -280,11 +295,11 @@ impl NCTalk {
         mapping
     }
 
-    pub fn get_room_keys(&self) -> Vec<&String> {
+    fn get_room_keys(&self) -> Vec<&String> {
         self.rooms.keys().collect::<Vec<&String>>()
     }
 
-    pub async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>> {
+    async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>> {
         self.rooms
             .get(&self.current_room_token)
             .ok_or("Room not found when it should be there")?
@@ -297,7 +312,7 @@ impl NCTalk {
             .await
     }
 
-    pub async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>> {
+    async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>> {
         self.current_room_token.clone_from(&token);
         self.rooms
             .get_mut(&self.current_room_token)
@@ -306,7 +321,7 @@ impl NCTalk {
             .await
     }
 
-    pub async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>> {
+    async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>> {
         let (response, timestamp) = if force_update {
             self.requester
                 .fetch_rooms_update(self.last_requested)

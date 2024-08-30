@@ -10,7 +10,7 @@ use ratatui::{
 
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use crate::backend::nc_talk::NCTalk;
+use crate::backend::nc_talk::{NCBackend, NCTalk};
 
 pub struct ChatSelector<'a> {
     pub state: TreeState<String>,

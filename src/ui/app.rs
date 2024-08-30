@@ -1,5 +1,5 @@
 use crate::{
-    backend::nc_talk::NCTalk,
+    backend::nc_talk::{NCBackend, NCTalk},
     config,
     ui::{
         chat_box::ChatBox, chat_selector::ChatSelector, help_box::HelpBox, input_box::InputBox,

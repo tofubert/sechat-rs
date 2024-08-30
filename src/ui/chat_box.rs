@@ -1,4 +1,4 @@
-use crate::backend::nc_talk::NCTalk;
+use crate::backend::nc_talk::{NCBackend, NCTalk};
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
