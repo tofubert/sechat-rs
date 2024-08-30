@@ -3,9 +3,11 @@ use super::{
     nc_notify::NCNotify,
     nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequest},
 };
+use async_trait::async_trait;
 use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
+use std::fmt::{Debug, Display};
 
 #[derive(Debug, FromPrimitive, PartialEq)]
 pub enum NCRoomTypes {
@@ -15,6 +17,42 @@ pub enum NCRoomTypes {
     ChangeLog,
     Deprecated,
     NoteToSelf,
+}
+
+#[async_trait]
+pub trait NCRoomInterface: Debug + Send + Display + Ord {
+    async fn new(
+        room_data: NCReqDataRoom,
+        requester: NCRequest,
+        notifier: NCNotify,
+        path_to_log: std::path::PathBuf,
+    ) -> Option<impl NCRoomInterface>;
+    fn get_last_room_level_message_id(&self) -> Option<i32>;
+    fn has_unread(&self) -> bool;
+    fn is_dm(&self) -> bool;
+    fn is_group(&self) -> bool;
+    fn get_messages(&self) -> &Vec<NCMessage>;
+    fn get_unread(&self) -> usize;
+    fn get_display_name(&self) -> &str;
+    fn get_last_read(&self) -> i32;
+    fn get_users(&self) -> &Vec<NCReqDataParticipants>;
+    fn get_room_type(&self) -> NCRoomTypes;
+
+    fn to_json(&self) -> String;
+    fn to_data(&self) -> NCReqDataRoom;
+    fn write_to_log(&mut self) -> Result<(), std::io::Error>;
+    fn to_token(&self) -> String;
+    async fn update_if_id_is_newer(
+        &mut self,
+        message_id: i32,
+        data_option: Option<&NCReqDataRoom>,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+    async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>>;
+    async fn update(
+        &mut self,
+        data_option: Option<&NCReqDataRoom>,
+    ) -> Result<(), Box<dyn std::error::Error>>;
+    async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Debug)]
@@ -40,8 +78,11 @@ impl NCRoom {
         }
         Ok(())
     }
+}
 
-    pub async fn new(
+#[async_trait]
+impl NCRoomInterface for NCRoom {
+    async fn new(
         room_data: NCReqDataRoom,
         requester: NCRequest,
         notifier: NCNotify,
@@ -73,7 +114,6 @@ impl NCRoom {
                 .await
                 .ok();
         }
-
         let participants = requester
             .fetch_participants(&room_data.token)
             .await
@@ -89,8 +129,108 @@ impl NCRoom {
             room_data,
         })
     }
+    // the room endpoint doesnt tell you about reactions...
+    fn get_last_room_level_message_id(&self) -> Option<i32> {
+        self.messages
+            .iter()
+            .filter(|&message| !message.is_reaction() && !message.is_edit_note())
+            .collect::<Vec<&NCMessage>>()
+            .last()
+            .map(|message| message.get_id())
+    }
 
-    pub async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>> {
+    fn has_unread(&self) -> bool {
+        self.room_data.unreadMessages > 0
+    }
+
+    fn is_dm(&self) -> bool {
+        match self.room_type {
+            NCRoomTypes::OneToOne | NCRoomTypes::NoteToSelf | NCRoomTypes::ChangeLog => true,
+            NCRoomTypes::Deprecated | NCRoomTypes::Group | NCRoomTypes::Public => false,
+        }
+    }
+
+    fn is_group(&self) -> bool {
+        match self.room_type {
+            NCRoomTypes::Deprecated
+            | NCRoomTypes::OneToOne
+            | NCRoomTypes::NoteToSelf
+            | NCRoomTypes::ChangeLog => false,
+            NCRoomTypes::Group | NCRoomTypes::Public => true,
+        }
+    }
+
+    fn get_room_type(&self) -> NCRoomTypes {
+        self.room_type
+    }
+
+    fn get_messages(&self) -> &Vec<NCMessage> {
+        &self.messages
+    }
+
+    fn get_unread(&self) -> usize {
+        self.room_data.unreadMessages.as_()
+    }
+
+    fn get_display_name(&self) -> &str {
+        &self.room_data.displayName
+    }
+
+    fn get_last_read(&self) -> i32 {
+        self.room_data.lastReadMessage
+    }
+    fn get_users(&self) -> &Vec<NCReqDataParticipants> {
+        &self.participants
+    }
+
+    fn to_json(&self) -> String {
+        serde_json::to_string(&self.room_data).unwrap()
+    }
+
+    fn to_data(&self) -> NCReqDataRoom {
+        self.room_data.clone()
+    }
+
+    fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+        use std::io::Write;
+
+        let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
+        let path = self.path_to_log.as_path();
+        // Open a file in write-only mode, returns `io::Result<File>`
+        let mut file = match std::fs::File::create(path) {
+            Err(why) => {
+                log::warn!(
+                    "Couldn't create log file {} for {}: {}",
+                    path.to_str().unwrap(),
+                    self.room_data.displayName,
+                    why
+                );
+                return Err(why);
+            }
+            Ok(file) => file,
+        };
+
+        match file.write_all(serde_json::to_string(&data).unwrap().as_bytes()) {
+            Err(why) => {
+                log::warn!(
+                    "couldn't write log file to {} for {}: {}",
+                    path.as_os_str()
+                        .to_str()
+                        .expect("Could not convert log path to string"),
+                    self.room_data.displayName,
+                    why
+                );
+                Err(why)
+            }
+            Ok(()) => Ok(()),
+        }
+    }
+
+    fn to_token(&self) -> String {
+        self.room_data.token.clone()
+    }
+
+    async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>> {
         log::debug!("Send Message {}", &message);
         let response = self
             .requester
@@ -102,7 +242,7 @@ impl NCRoom {
         }
     }
 
-    pub async fn update(
+    async fn update(
         &mut self,
         data_option: Option<&NCReqDataRoom>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -140,18 +280,7 @@ impl NCRoom {
 
         Ok(())
     }
-
-    // the room endpoint doesnt tell you about reactions...
-    pub fn get_last_room_level_message_id(&self) -> Option<i32> {
-        self.messages
-            .iter()
-            .filter(|&message| !message.is_reaction() && !message.is_edit_note())
-            .collect::<Vec<&NCMessage>>()
-            .last()
-            .map(|message| message.get_id())
-    }
-
-    pub async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
             self.requester
                 .mark_chat_read(
@@ -162,44 +291,7 @@ impl NCRoom {
         }
         Ok(())
     }
-
-    pub fn has_unread(&self) -> bool {
-        self.room_data.unreadMessages > 0
-    }
-
-    pub fn is_dm(&self) -> bool {
-        match self.room_type {
-            NCRoomTypes::OneToOne | NCRoomTypes::NoteToSelf | NCRoomTypes::ChangeLog => true,
-            NCRoomTypes::Deprecated | NCRoomTypes::Group | NCRoomTypes::Public => false,
-        }
-    }
-
-    pub fn is_group(&self) -> bool {
-        match self.room_type {
-            NCRoomTypes::Deprecated
-            | NCRoomTypes::OneToOne
-            | NCRoomTypes::NoteToSelf
-            | NCRoomTypes::ChangeLog => false,
-            NCRoomTypes::Group | NCRoomTypes::Public => true,
-        }
-    }
-
-    pub fn get_unread(&self) -> usize {
-        self.room_data.unreadMessages.as_()
-    }
-
-    pub fn get_display_name(&self) -> &str {
-        &self.room_data.displayName
-    }
-
-    pub fn get_last_read(&self) -> i32 {
-        self.room_data.lastReadMessage
-    }
-    pub fn get_users(&self) -> &Vec<NCReqDataParticipants> {
-        &self.participants
-    }
-
-    pub async fn update_if_id_is_newer(
+    async fn update_if_id_is_newer(
         &mut self,
         message_id: i32,
         data_option: Option<&NCReqDataRoom>,
@@ -229,53 +321,6 @@ impl NCRoom {
             }
         }
         Ok(())
-    }
-
-    pub fn to_json(&self) -> String {
-        serde_json::to_string(&self.room_data).unwrap()
-    }
-
-    pub fn to_data(&self) -> NCReqDataRoom {
-        self.room_data.clone()
-    }
-
-    pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
-        use std::io::Write;
-
-        let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
-        let path = self.path_to_log.as_path();
-        // Open a file in write-only mode, returns `io::Result<File>`
-        let mut file = match std::fs::File::create(path) {
-            Err(why) => {
-                log::warn!(
-                    "Couldn't create log file {} for {}: {}",
-                    path.to_str().unwrap(),
-                    self.room_data.displayName,
-                    why
-                );
-                return Err(why);
-            }
-            Ok(file) => file,
-        };
-
-        match file.write_all(serde_json::to_string(&data).unwrap().as_bytes()) {
-            Err(why) => {
-                log::warn!(
-                    "couldn't write log file to {} for {}: {}",
-                    path.as_os_str()
-                        .to_str()
-                        .expect("Could not convert log path to string"),
-                    self.room_data.displayName,
-                    why
-                );
-                Err(why)
-            }
-            Ok(()) => Ok(()),
-        }
-    }
-
-    pub fn to_token(&self) -> String {
-        self.room_data.token.clone()
     }
 }
 

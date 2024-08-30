@@ -1,4 +1,4 @@
-use crate::backend::nc_talk::NCBackend;
+use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -27,7 +27,7 @@ impl<'a> ChatBox<'a> {
         }
     }
 
-    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &dyn NCBackend) {
+    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &impl NCBackend) {
         let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
@@ -35,15 +35,16 @@ impl<'a> ChatBox<'a> {
         }
     }
 
-    pub fn update_messages(&mut self, backend: &dyn NCBackend) {
+    pub fn update_messages(&mut self, backend: &impl NCBackend) {
         use itertools::Itertools;
         use std::convert::TryInto;
 
         self.messages.clear();
-        for message_data in
-            backend.get_current_room().messages.iter().filter(|mes| {
-                !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted()
-            })
+        for message_data in backend
+            .get_current_room()
+            .get_messages()
+            .iter()
+            .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
         {
             let name = textwrap::wrap(
                 message_data.get_name(),

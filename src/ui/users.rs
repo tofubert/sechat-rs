@@ -4,7 +4,7 @@ use ratatui::{
 };
 use style::Styled;
 
-use crate::backend::nc_talk::NCBackend;
+use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 
 pub struct Users<'a> {
     user_list: Vec<Row<'a>>,
@@ -27,7 +27,7 @@ impl<'a> Users<'a> {
     pub fn render_area(&self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(self, area, &mut self.state.clone());
     }
-    pub fn update(&mut self, backend: &dyn NCBackend) {
+    pub fn update(&mut self, backend: &impl NCBackend) {
         self.user_list.clear();
         let mut new_users = backend.get_current_room().get_users().clone();
         new_users.sort_by(|user1, user2| user1.displayName.cmp(&user2.displayName));

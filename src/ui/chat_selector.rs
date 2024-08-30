@@ -10,6 +10,7 @@ use ratatui::{
 
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
+use crate::backend::nc_room::NCRoomInterface;
 use crate::backend::nc_talk::NCBackend;
 
 pub struct ChatSelector<'a> {
@@ -18,7 +19,7 @@ pub struct ChatSelector<'a> {
 }
 
 impl<'a> ChatSelector<'a> {
-    pub fn new(backend: &dyn NCBackend) -> Self {
+    pub fn new(backend: &impl NCBackend) -> Self {
         Self {
             state: TreeState::default(),
             items: vec![
@@ -31,7 +32,7 @@ impl<'a> ChatSelector<'a> {
                         .map(|token| {
                             TreeItem::new_leaf::<String>(
                                 token.clone(),
-                                backend.get_room_by_token(token).get_display_name().into(),
+                                backend.get_room(token).get_display_name().into(),
                             )
                         })
                         .collect_vec(),
@@ -65,7 +66,7 @@ impl<'a> ChatSelector<'a> {
         }
     }
 
-    pub fn update(&mut self, backend: &dyn NCBackend) -> Result<(), Box<dyn Error>> {
+    pub fn update(&mut self, backend: &impl NCBackend) -> Result<(), Box<dyn Error>> {
         self.items = vec![
             TreeItem::new::<String>(
                 "unread".to_string(),
@@ -76,7 +77,7 @@ impl<'a> ChatSelector<'a> {
                     .map(|token| {
                         TreeItem::new_leaf::<String>(
                             token.clone(),
-                            backend.get_room_by_token(token).get_display_name().into(),
+                            backend.get_room(token).get_display_name().into(),
                         )
                     })
                     .collect_vec(),

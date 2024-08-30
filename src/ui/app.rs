@@ -1,5 +1,5 @@
 use crate::{
-    backend::nc_talk::NCBackend,
+    backend::{nc_room::NCRoomInterface, nc_talk::NCBackend},
     config,
     ui::{
         chat_box::ChatBox, chat_selector::ChatSelector, help_box::HelpBox, input_box::InputBox,
@@ -19,9 +19,9 @@ pub enum CurrentScreen {
     Helping,
 }
 
-pub struct App<'a> {
+pub struct App<'a, Backend: NCBackend> {
     pub current_screen: CurrentScreen, // the current screen the user is looking at, and will later determine what is rendered.
-    backend: Box<dyn NCBackend>,
+    backend: Backend,
     title: TitleBar<'a>,
     chat: ChatBox<'a>,
     pub selector: ChatSelector<'a>,
@@ -31,27 +31,25 @@ pub struct App<'a> {
     user_sidebar_visible: bool,
 }
 
-impl<'a> App<'a> {
-    pub fn new(backend: Box<dyn NCBackend>) -> Self {
+impl<'a, Backend: NCBackend> App<'a, Backend> {
+    pub fn new(backend: Backend) -> Self {
         Self {
             current_screen: CurrentScreen::Reading,
             title: TitleBar::new(
                 CurrentScreen::Reading,
-                backend
-                    .get_room_by_token(backend.get_current_room_token())
-                    .to_string(),
+                backend.get_current_room().to_string(),
             ),
-            selector: ChatSelector::new(backend.as_ref()),
+            selector: ChatSelector::new(&backend),
             input: InputBox::new(""),
             chat: {
                 let mut chat = ChatBox::new();
-                chat.update_messages(backend.as_ref());
+                chat.update_messages(&backend);
                 chat.select_last_message();
                 chat
             },
             users: {
                 let mut users = Users::new();
-                users.update(backend.as_ref());
+                users.update(&backend);
                 users
             },
             backend,
@@ -89,19 +87,18 @@ impl<'a> App<'a> {
                     .constraints([Constraint::Percentage(80), Constraint::Percentage(20)])
                     .split(main_layout[0]);
                 self.chat
-                    .set_width_and_update_if_change(chat_layout[0].width, self.backend.as_ref());
+                    .set_width_and_update_if_change(chat_layout[0].width, &self.backend);
                 self.chat.render_area(f, chat_layout[0]);
                 self.users.render_area(f, chat_layout[1]);
             } else {
                 self.chat
-                    .set_width_and_update_if_change(main_layout[0].width, self.backend.as_ref());
+                    .set_width_and_update_if_change(main_layout[0].width, &self.backend);
                 self.chat.render_area(f, main_layout[0]);
             };
 
             self.input.render_area(f, main_layout[1]);
         }
-        self.title
-            .update(self.current_screen, self.backend.as_ref());
+        self.title.update(self.current_screen, &self.backend);
         self.title.render_area(f, base_layout[0]);
     }
 
@@ -113,11 +110,10 @@ impl<'a> App<'a> {
     }
 
     fn update_ui(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.title
-            .update(self.current_screen, self.backend.as_ref());
-        self.selector.update(self.backend.as_ref())?;
-        self.chat.update_messages(self.backend.as_ref());
-        self.users.update(self.backend.as_ref());
+        self.title.update(self.current_screen, &self.backend);
+        self.selector.update(&self.backend)?;
+        self.chat.update_messages(&self.backend);
+        self.users.update(&self.backend);
         Ok(())
     }
 
