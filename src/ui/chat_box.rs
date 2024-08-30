@@ -1,4 +1,4 @@
-use crate::backend::nc_talk::{NCBackend, NCTalk};
+use crate::backend::nc_talk::NCBackend;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -27,7 +27,7 @@ impl<'a> ChatBox<'a> {
         }
     }
 
-    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &NCTalk) {
+    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &dyn NCBackend) {
         let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
@@ -35,7 +35,7 @@ impl<'a> ChatBox<'a> {
         }
     }
 
-    pub fn update_messages(&mut self, backend: &NCTalk) {
+    pub fn update_messages(&mut self, backend: &dyn NCBackend) {
         use itertools::Itertools;
         use std::convert::TryInto;
 

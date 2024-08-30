@@ -29,7 +29,7 @@ async fn main() {
     let requester = backend::nc_request::NCRequest::new().expect("cannot create NCRequest");
 
     match backend::nc_talk::NCTalk::new(requester).await {
-        Ok(backend) => ui::run(backend).await.expect("crashed"),
+        Ok(backend) => ui::run(Box::new(backend)).await.expect("crashed"),
         Err(why) => {
             log::error!("Failed to create backend because: {why}");
         }

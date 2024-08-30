@@ -7,7 +7,7 @@ pub mod title_bar;
 pub mod users;
 
 use super::{
-    backend::nc_talk::NCTalk,
+    backend::nc_talk::NCBackend,
     config,
     ui::app::{App, CurrentScreen},
 };
@@ -138,7 +138,7 @@ enum ProcessEventResult {
     Exit,
 }
 
-pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(nc_backend: Box<dyn NCBackend>) -> Result<(), Box<dyn std::error::Error>> {
     install_hooks()?;
 
     // create app and run it

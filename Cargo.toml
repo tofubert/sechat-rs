@@ -53,6 +53,7 @@ strip-ansi-escapes = "0.2.0"
 tracing = "0.1.40"
 cfg-if = "1.0.0"
 tui-textarea = "0.6.1"
+async-trait = "0.1.81"
 
 [lints.clippy]
 pedantic = "warn"

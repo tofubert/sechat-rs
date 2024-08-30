@@ -6,16 +6,19 @@ use crate::{
     },
     config::{self},
 };
+use async_trait::async_trait;
 use core::panic;
 use itertools::Itertools;
-use std::{collections::HashMap, error::Error, path::PathBuf};
+use std::{collections::HashMap, error::Error, fmt::Debug, path::PathBuf};
 
-pub trait NCBackend {
+#[async_trait]
+pub trait NCBackend: Debug + Send {
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
     fn get_current_room(&self) -> &NCRoom;
-    fn get_room_by_token(&self, token: &String) -> &NCRoom;
+    fn get_current_room_token(&self) -> &str;
+    fn get_room_by_token(&self, token: &str) -> &NCRoom;
     fn get_unread_rooms(&self) -> Vec<String>;
-    fn get_room_by_displayname(&self, name: &String) -> &NCRoom;
+    fn get_room_by_displayname(&self, name: &str) -> &NCRoom;
     fn add_room(&mut self, room_option: Option<NCRoom>);
     fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)>;
     fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)>;
@@ -183,6 +186,8 @@ impl NCTalk {
         Ok(talk)
     }
 }
+
+#[async_trait]
 impl NCBackend for NCTalk {
     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
@@ -231,7 +236,11 @@ impl NCBackend for NCTalk {
         &self.rooms[&self.current_room_token]
     }
 
-    fn get_room_by_token(&self, token: &String) -> &NCRoom {
+    fn get_current_room_token(&self) -> &str {
+        self.current_room_token.as_str()
+    }
+
+    fn get_room_by_token(&self, token: &str) -> &NCRoom {
         &self.rooms[token]
     }
 
@@ -244,7 +253,7 @@ impl NCBackend for NCTalk {
             .collect::<Vec<String>>()
     }
 
-    fn get_room_by_displayname(&self, name: &String) -> &NCRoom {
+    fn get_room_by_displayname(&self, name: &str) -> &NCRoom {
         for room in self.rooms.values() {
             if room.to_string() == *name {
                 return room;
@@ -358,4 +367,45 @@ impl NCBackend for NCTalk {
         }
         Ok(())
     }
+}
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[derive(Debug)]
+    pub struct MockBackend {}
+
+    // #[async_trait]
+    // impl NCBackend for MockBackend {
+    //     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+    //         Ok(())
+    //     }
+    //     fn get_current_room(&self) -> &NCRoom {}
+    //     fn get_room_by_token(&self, token: &String) -> &NCRoom {}
+    //     fn get_current_room_token(&self) -> &str {}
+    //     fn get_unread_rooms(&self) -> Vec<String> {
+    //         vec![]
+    //     }
+    //     fn get_room_by_displayname(&self, name: &String) -> &NCRoom {}
+    //     fn add_room(&mut self, room_option: Option<NCRoom>) {}
+    //     fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
+    //         vec![]
+    //     }
+    //     fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
+    //         vec![]
+    //     }
+    //     fn get_room_keys(&self) -> Vec<&String> {
+    //         vec![]
+    //     }
+    //     async fn send_message(&mut self, _message: String) -> Result<(), Box<dyn Error>> {
+    //         Ok(())
+    //     }
+    //     async fn select_room(&mut self, _token: String) -> Result<(), Box<dyn Error>> {
+    //         Ok(())
+    //     }
+    //     async fn update_rooms(&mut self, _force_update: bool) -> Result<(), Box<dyn Error>> {
+    //         Ok(())
+    //     }
+    // }
 }

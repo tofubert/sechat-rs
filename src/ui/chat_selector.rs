@@ -10,7 +10,7 @@ use ratatui::{
 
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
-use crate::backend::nc_talk::{NCBackend, NCTalk};
+use crate::backend::nc_talk::NCBackend;
 
 pub struct ChatSelector<'a> {
     pub state: TreeState<String>,
@@ -18,7 +18,7 @@ pub struct ChatSelector<'a> {
 }
 
 impl<'a> ChatSelector<'a> {
-    pub fn new(backend: &NCTalk) -> Self {
+    pub fn new(backend: &dyn NCBackend) -> Self {
         Self {
             state: TreeState::default(),
             items: vec![
@@ -65,7 +65,7 @@ impl<'a> ChatSelector<'a> {
         }
     }
 
-    pub fn update(&mut self, backend: &NCTalk) -> Result<(), Box<dyn Error>> {
+    pub fn update(&mut self, backend: &dyn NCBackend) -> Result<(), Box<dyn Error>> {
         self.items = vec![
             TreeItem::new::<String>(
                 "unread".to_string(),

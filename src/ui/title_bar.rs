@@ -1,7 +1,4 @@
-use crate::{
-    backend::nc_talk::{NCBackend, NCTalk},
-    ui::app::CurrentScreen,
-};
+use crate::{backend::nc_talk::NCBackend, ui::app::CurrentScreen};
 use num_traits::AsPrimitive;
 use ratatui::{
     prelude::*,
@@ -26,7 +23,7 @@ impl<'a> TitleBar<'a> {
         }
     }
 
-    pub fn update(&mut self, screen: CurrentScreen, backend: &NCTalk) {
+    pub fn update(&mut self, screen: CurrentScreen, backend: &dyn NCBackend) {
         self.mode = screen.to_string();
         self.room = backend.get_current_room().to_string();
         self.unread = backend.get_current_room().get_unread();
