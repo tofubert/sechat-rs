@@ -21,12 +21,6 @@ pub enum NCRoomTypes {
 
 #[async_trait]
 pub trait NCRoomInterface: Debug + Send + Display + Ord {
-    async fn new(
-        room_data: NCReqDataRoom,
-        requester: NCRequest,
-        notifier: NCNotify,
-        path_to_log: std::path::PathBuf,
-    ) -> Option<impl NCRoomInterface>;
     fn get_last_room_level_message_id(&self) -> Option<i32>;
     fn has_unread(&self) -> bool;
     fn is_dm(&self) -> bool;
@@ -36,7 +30,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord {
     fn get_display_name(&self) -> &str;
     fn get_last_read(&self) -> i32;
     fn get_users(&self) -> &Vec<NCReqDataParticipants>;
-    fn get_room_type(&self) -> NCRoomTypes;
+    fn get_room_type(&self) -> &NCRoomTypes;
 
     fn to_json(&self) -> String;
     fn to_data(&self) -> NCReqDataRoom;
@@ -67,22 +61,7 @@ pub struct NCRoom {
 }
 
 impl NCRoom {
-    async fn fetch_messages(
-        requester: &NCRequest,
-        token: &str,
-        messages: &mut Vec<NCMessage>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let response = requester.fetch_chat_initial(token, 200).await?;
-        for message in response {
-            messages.push(message.into());
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl NCRoomInterface for NCRoom {
-    async fn new(
+    pub async fn new(
         room_data: NCReqDataRoom,
         requester: NCRequest,
         notifier: NCNotify,
@@ -129,6 +108,22 @@ impl NCRoomInterface for NCRoom {
             room_data,
         })
     }
+    async fn fetch_messages(
+        requester: &NCRequest,
+        token: &str,
+        messages: &mut Vec<NCMessage>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let response = requester.fetch_chat_initial(token, 200).await?;
+        for message in response {
+            messages.push(message.into());
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl NCRoomInterface for NCRoom {
+
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
@@ -160,8 +155,8 @@ impl NCRoomInterface for NCRoom {
         }
     }
 
-    fn get_room_type(&self) -> NCRoomTypes {
-        self.room_type
+    fn get_room_type(&self) -> &NCRoomTypes {
+        &self.room_type
     }
 
     fn get_messages(&self) -> &Vec<NCMessage> {

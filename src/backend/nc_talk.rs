@@ -11,7 +11,7 @@ use core::panic;
 use itertools::Itertools;
 use std::{collections::HashMap, error::Error, fmt::Debug, path::PathBuf};
 
-use super::nc_room::NCRoomTypes;
+use super::nc_room::{NCRoom, NCRoomTypes};
 
 #[async_trait]
 pub trait NCBackend: Debug + Send {
@@ -32,8 +32,8 @@ pub trait NCBackend: Debug + Send {
 }
 
 #[derive(Debug)]
-pub struct NCTalk<Room> {
-    rooms: HashMap<String, Room>,
+pub struct NCTalk {
+    rooms: HashMap<String, NCRoom>,
     chat_data_path: PathBuf,
     last_requested: i64,
     requester: NCRequest,
@@ -41,12 +41,12 @@ pub struct NCTalk<Room> {
     pub current_room_token: String,
 }
 
-impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
+impl NCTalk {
     async fn parse_response(
         response: Vec<NCReqDataRoom>,
         requester: NCRequest,
         notifier: NCNotify,
-        rooms: &mut HashMap<String, Room>,
+        rooms: &mut HashMap<String, NCRoom>,
         chat_log_path: PathBuf,
     ) {
         // for res in response {
@@ -87,15 +87,15 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
         requester_box: NCRequest,
         notifier: NCNotify,
         chat_log_path: PathBuf,
-    ) -> (String, Option<Room>) {
+    ) -> (String, Option<NCRoom>) {
         (
             packaged_child.token.clone(),
-            Room::new(packaged_child, requester_box, notifier, chat_log_path).await,
+            NCRoom::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
     pub async fn new(
         requester: NCRequest,
-    ) -> Result<NCTalk<impl NCRoomInterface + 'static>, Box<dyn Error>> {
+    ) -> Result<NCTalk, Box<dyn Error>> {
         let notify = NCNotify::new();
 
         let chat_log_path = config::get().get_server_data_dir();
@@ -110,7 +110,7 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
             .map(|room| (room.token.clone(), room))
             .collect::<HashMap<String, &NCReqDataRoom>>();
 
-        let mut rooms = HashMap::<String, Room>::new();
+        let mut rooms = HashMap::<String, NCRoom>::new();
 
         if path.exists() {
             if let Ok(mut data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
@@ -120,7 +120,7 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
                 for (token, room) in &mut data {
                     handles.insert(
                         token.clone(),
-                        tokio::spawn(Room::new(
+                        tokio::spawn(NCRoom::new(
                             room.clone(),
                             requester.clone(),
                             notify.clone(),
@@ -152,7 +152,7 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
                         .filter(|data| initial_message_ids.contains_key(&data.token))
                         .cloned()
                         .collect::<Vec<NCReqDataRoom>>();
-                    NCTalk::<Room>::parse_response(
+                    NCTalk::parse_response(
                         remaining_room_data,
                         requester.clone(),
                         notify.clone(),
@@ -168,7 +168,7 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
                 log::info!("Loaded Rooms from log files");
             } else {
                 log::debug!("Failed to parse top level json, falling back to fetching");
-                NCTalk::<Room>::parse_response(
+                NCTalk::parse_response(
                     response,
                     requester.clone(),
                     notify.clone(),
@@ -179,7 +179,7 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
             }
         } else {
             log::debug!("No Log files found in Path, fetching logs from server.");
-            NCTalk::<Room>::parse_response(
+            NCTalk::parse_response(
                 response,
                 requester.clone(),
                 notify.clone(),
@@ -214,8 +214,8 @@ impl<Room: NCRoomInterface + 'static> NCTalk<Room> {
 }
 
 #[async_trait]
-impl<'a, TalkRoom: NCRoomInterface + 'static> NCBackend for NCTalk<TalkRoom> {
-    type Room = TalkRoom;
+impl NCBackend for NCTalk {
+    type Room = NCRoom;
     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
@@ -283,7 +283,7 @@ impl<'a, TalkRoom: NCRoomInterface + 'static> NCBackend for NCTalk<TalkRoom> {
     fn get_room_by_displayname(&self, name: &str) -> &str {
         for room in self.rooms.values() {
             if room.to_string() == *name {
-                return room.to_token().as_str();
+                return self.rooms[&room.to_token()].as_str();
             }
         }
         panic!("room doesnt exist {}", name);
@@ -370,7 +370,7 @@ impl<'a, TalkRoom: NCRoomInterface + 'static> NCBackend for NCTalk<TalkRoom> {
             } else {
                 self.notifier.new_room(&room.displayName)?;
                 self.add_room(
-                    Self::Room::new(
+                    NCRoom::new(
                         room,
                         self.requester.clone(),
                         self.notifier.clone(),

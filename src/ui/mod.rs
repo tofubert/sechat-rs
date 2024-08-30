@@ -6,7 +6,7 @@ pub mod input_box;
 pub mod title_bar;
 pub mod users;
 
-use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCTalk};
+use crate::backend::nc_talk::NCTalk;
 
 use super::{
     config,
@@ -140,7 +140,7 @@ enum ProcessEventResult {
 }
 
 pub async fn run(
-    nc_backend: NCTalk<impl NCRoomInterface + 'static>,
+    nc_backend: NCTalk,
 ) -> Result<(), Box<dyn std::error::Error>> {
     install_hooks()?;
 
@@ -157,7 +157,7 @@ pub async fn run(
 
 async fn run_app<'a, B: Backend>(
     mut terminal: Terminal<B>,
-    mut app: App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    mut app: App<'a, NCTalk>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     app.select_room().await?;
     log::debug!("Entering Main Loop");
@@ -180,7 +180,7 @@ async fn run_app<'a, B: Backend>(
 }
 
 async fn process_event<'a>(
-    app: &mut App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    app: &mut App<'a, NCTalk>,
     event: Event,
 ) -> Result<ProcessEventResult, Box<dyn std::error::Error>> {
     // It's guaranteed that `read` won't block, because `poll` returned
@@ -217,7 +217,7 @@ async fn process_event<'a>(
 
 async fn handle_key_in_opening<'a>(
     key: KeyEvent,
-    app: &mut App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    app: &mut App<'a, NCTalk>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
@@ -240,7 +240,7 @@ async fn handle_key_in_opening<'a>(
 
 async fn handle_key_in_editing<'a>(
     key: Input,
-    app: &mut App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    app: &mut App<'a, NCTalk>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key {
         Input { key: Key::Esc, .. } => app.current_screen = CurrentScreen::Reading,
@@ -261,7 +261,7 @@ async fn handle_key_in_editing<'a>(
 
 fn handle_key_in_help<'a>(
     key: KeyEvent,
-    app: &mut App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    app: &mut App<'a, NCTalk>,
 ) {
     match key.code {
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
@@ -273,7 +273,7 @@ fn handle_key_in_help<'a>(
 
 fn handle_key_in_exit<'a>(
     key: KeyEvent,
-    app: &mut App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    app: &mut App<'a, NCTalk>,
 ) -> Option<Result<ProcessEventResult, Box<dyn std::error::Error>>> {
     match key.code {
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
@@ -294,7 +294,7 @@ fn handle_key_in_exit<'a>(
 
 async fn handle_key_in_reading<'a>(
     key: KeyEvent,
-    app: &mut App<'a, NCTalk<impl NCRoomInterface + 'static>>,
+    app: &mut App<'a, NCTalk>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {

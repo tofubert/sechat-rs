@@ -2,7 +2,6 @@ mod backend;
 mod config;
 mod ui;
 
-use backend::nc_room::NCRoom;
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -29,7 +28,7 @@ async fn main() {
 
     let requester = backend::nc_request::NCRequest::new().expect("cannot create NCRequest");
 
-    match backend::nc_talk::NCTalk::<NCRoom>::new(requester).await {
+    match backend::nc_talk::NCTalk::new(requester).await {
         Ok(backend) => ui::run(backend).await.expect("crashed"),
         Err(why) => {
             log::error!("Failed to create backend because: {why}");
