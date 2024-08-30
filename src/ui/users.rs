@@ -71,3 +71,39 @@ impl<'a> StatefulWidget for &Users<'a> {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use backend::TestBackend;
+
+    use super::*;
+
+    #[test]
+    fn render_users() {
+        let backend = TestBackend::new(10, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let users = Users::new();
+        terminal
+            .draw(|frame| users.render_area(frame, Rect::new(0, 0, 8, 8)))
+            .unwrap();
+        let mut expected = Buffer::with_lines([
+            "│Users    ",
+            "│         ",
+            "│         ",
+            "│         ",
+            "│         ",
+            "│         ",
+            "│         ",
+            "│         ",
+            "          ",
+            "          ",
+        ]);
+        expected.set_style(Rect::new(0, 0, 8, 8), Style::new().white().on_black());
+
+        for x in 1..=7 {
+            expected[(x, 0)].set_style(Style::new().green().on_black().bold());
+        }
+
+        terminal.backend().assert_buffer(&expected);
+    }
+}
