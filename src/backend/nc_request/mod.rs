@@ -2,6 +2,16 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+mod nc_req_data_message;
+mod nc_req_data_room;
+mod nc_req_data_user;
+mod nc_request_ocs_wrapper;
+
+pub use nc_req_data_message::*;
+pub use nc_req_data_room::*;
+pub use nc_req_data_user::*;
+pub use nc_request_ocs_wrapper::*;
+
 use crate::config;
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
@@ -9,7 +19,7 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Client, Response, Url,
 };
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};
 
 #[derive(Debug, Clone)]
@@ -20,227 +30,12 @@ pub struct NCRequest {
     json_dump_path: Option<std::path::PathBuf>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct NCReqMeta {
-    status: String,
-    statuscode: i32,
-    message: String,
-}
-
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessageParameter {
     #[serde(rename = "type")]
     param_type: String,
     id: String,
     name: String,
-}
-
-fn str_or_status<'de, D>(deserializer: D) -> Result<NCReqDataUserStatus, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NCReqDataMessageVec {
-        ParamMap(Box<NCReqDataUserStatus>),
-        String(String),
-    }
-
-    Ok(match NCReqDataMessageVec::deserialize(deserializer)? {
-        NCReqDataMessageVec::ParamMap(v) => *v, // Ignoring parsing errors
-        NCReqDataMessageVec::String(_) => NCReqDataUserStatus::default(),
-    })
-}
-
-fn arr_or_message<'de, D>(deserializer: D) -> Result<NCReqDataMessage, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NCReqDataMessageVec {
-        ParamMap(Box<NCReqDataMessage>),
-        Vec(Vec<i32>),
-    }
-
-    Ok(match NCReqDataMessageVec::deserialize(deserializer)? {
-        NCReqDataMessageVec::ParamMap(v) => *v, // Ignoring parsing errors
-        NCReqDataMessageVec::Vec(_) => NCReqDataMessage::default(),
-    })
-}
-
-fn arr_or_messageParam<'de, D>(
-    deserializer: D,
-) -> Result<HashMap<String, NCReqDataMessageParameter>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum NCReqDataMessageParameterMap {
-        ParamMap(HashMap<String, NCReqDataMessageParameter>),
-        Vec(Vec<i32>),
-    }
-
-    Ok(
-        match NCReqDataMessageParameterMap::deserialize(deserializer)? {
-            NCReqDataMessageParameterMap::ParamMap(v) => v, // Ignoring parsing errors
-            NCReqDataMessageParameterMap::Vec(_) => HashMap::new(),
-        },
-    )
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct NCReqDataMessageParent {
-    pub id: i32,
-    pub token: String,
-    pub actorType: String,
-    pub actorId: String,
-    pub actorDisplayName: String,
-    pub timestamp: i32,
-    pub systemMessage: String,
-    pub messageType: String,
-    pub isReplyable: bool,
-    pub referenceId: String,
-    pub message: String,
-    #[serde(deserialize_with = "arr_or_messageParam")]
-    pub messageParameters: HashMap<String, NCReqDataMessageParameter>,
-    pub expirationTimestamp: i32,
-    pub reactions: HashMap<String, i32>,
-    #[serde(default)]
-    pub reactionsSelf: Vec<String>,
-    pub markdown: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct NCReqDataMessage {
-    pub id: i32,
-    pub token: String,
-    pub actorType: String,
-    pub actorId: String,
-    pub actorDisplayName: String,
-    pub timestamp: i64,
-    pub systemMessage: String,
-    pub messageType: String,
-    pub isReplyable: bool,
-    pub referenceId: String,
-    pub message: String,
-    #[serde(deserialize_with = "arr_or_messageParam")]
-    pub messageParameters: HashMap<String, NCReqDataMessageParameter>,
-    pub expirationTimestamp: i32,
-    #[serde(default)]
-    pub parent: NCReqDataMessageParent,
-    pub reactions: HashMap<String, i32>,
-    #[serde(default)]
-    pub reactionsSelf: Vec<String>,
-    pub markdown: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct NCReqDataRoom {
-    pub id: i32,
-    pub token: String,
-    #[serde(rename = "type")]
-    pub roomtype: i32,
-    pub name: String,
-    pub displayName: String,
-    pub description: String,
-    pub participantType: i32,
-    pub attendeeId: i32,
-    pub attendeePin: String,
-    pub actorType: String,
-    pub actorId: String,
-    pub permissions: i32,
-    pub attendeePermissions: i32,
-    pub callPermissions: i32,
-    pub defaultPermissions: i32,
-    pub participantFlags: i32,
-    pub readOnly: i32,
-    pub listable: i32,
-    pub messageExpiration: i32,
-    lastPing: i32,
-    sessionId: String,
-    hasPassword: bool,
-    hasCall: bool,
-    callFlag: i32,
-    canStartCall: bool,
-    canDeleteConversation: bool,
-    canLeaveConversation: bool,
-    lastActivity: i32,
-    isFavorite: bool,
-    notificationLevel: i32,
-    lobbyState: i32,
-    lobbyTimer: i32,
-    sipEnabled: i32,
-    canEnableSIP: bool,
-    pub unreadMessages: i32,
-    unreadMention: bool,
-    unreadMentionDirect: bool,
-    pub lastReadMessage: i32,
-    lastCommonReadMessage: i32,
-    #[serde(deserialize_with = "arr_or_message")]
-    pub lastMessage: NCReqDataMessage,
-    objectType: String,
-    objectId: String,
-    breakoutRoomMode: i32,
-    breakoutRoomStatus: i32,
-    avatarVersion: String,
-    isCustomAvatar: bool,
-    callStartTime: i32,
-    callRecording: i32,
-    recordingConsent: i32,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct NCReqDataParticipants {
-    attendeeId: i32,
-    actorType: String,
-    actorId: String,
-    displayName: String,
-    participantType: i32,
-    lastPing: i32,
-    inCall: i32,
-    permissions: i32,
-    attendeePermissions: i32,
-    sessionIds: Vec<String>,
-    status: Option<String>,
-    statusIcon: Option<String>,
-    statusMessage: Option<String>,
-    statusClearAt: Option<i32>,
-    roomToken: Option<String>,
-    phoneNumber: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct NCReqDataUserStatus {
-    status: String,
-    message: Option<String>,
-    icon: Option<String>,
-    clearAt: Option<i32>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct NCReqDataUser {
-    id: String,
-    label: String,
-    icon: String,
-    source: String,
-    #[serde(deserialize_with = "str_or_status")]
-    status: NCReqDataUserStatus,
-    subline: String,
-    shareWithDisplayNameUnique: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct NCReqOCSWrapper<T> {
-    ocs: NCReqOCS<T>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct NCReqOCS<T> {
-    meta: NCReqMeta,
-    data: T,
 }
 
 impl NCRequest {
