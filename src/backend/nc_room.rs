@@ -9,8 +9,9 @@ use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
 use std::fmt::{Debug, Display};
 
-#[derive(Debug, FromPrimitive, PartialEq)]
+#[derive(Debug, FromPrimitive, PartialEq, Default)]
 pub enum NCRoomTypes {
+    #[default]
     OneToOne = 1,
     Group,
     Public,
@@ -19,11 +20,6 @@ pub enum NCRoomTypes {
     NoteToSelf,
 }
 
-impl Default for NCRoomTypes {
-    fn default() -> Self {
-        NCRoomTypes::OneToOne
-    }
-}
 #[cfg(test)]
 use mockall::{automock, predicate::*};
 

@@ -8,7 +8,12 @@ use crate::{
 };
 use async_trait::async_trait;
 use itertools::Itertools;
-use std::{collections::HashMap, error::Error, fmt::Debug, path::PathBuf};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 
 use super::nc_room::{NCRoom, NCRoomTypes};
 
@@ -48,21 +53,6 @@ impl NCTalk {
         rooms: &mut HashMap<String, NCRoom>,
         chat_log_path: PathBuf,
     ) {
-        // for res in response {
-        //     let room_tuple = NCTalk::<Room>::new_room(
-        //         res,
-        //         requester.clone(),
-        //         notifier.clone(),
-        //         chat_log_path.clone(),
-        //     );
-        //     let (name, room_option) = room_tuple.await;
-        //     if let Some(room) = room_option {
-        //         rooms.insert(name, room);
-        //     } else {
-        //         log::info!("Encountered a room that cannot be added {} ", name);
-        //     }
-        // }
-
         let v = response.into_iter().map(|child| {
             tokio::spawn(NCTalk::new_room(
                 child,
@@ -79,6 +69,46 @@ impl NCTalk {
                 log::info!("Encountered a room that cannot be added {} ", name);
             }
         }
+    }
+    async fn parse_files(
+        mut data: HashMap<String, NCReqDataRoom>,
+        requester: &NCRequest,
+        notify: &NCNotify,
+        chat_log_path: &Path,
+        initial_message_ids: &mut HashMap<String, &NCReqDataRoom>,
+        rooms: &mut HashMap<String, NCRoom>,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut handles = HashMap::new();
+        for (token, room) in &mut data {
+            handles.insert(
+                token.clone(),
+                tokio::spawn(NCRoom::new(
+                    room.clone(),
+                    requester.clone(),
+                    notify.clone(),
+                    chat_log_path.to_path_buf(),
+                )),
+            );
+        }
+        for (token, room_future) in &mut handles {
+            //we can safely unwrap here bc the json file on disk shall never be this broken.
+            let mut json_room = room_future.await?.unwrap();
+            if initial_message_ids.contains_key::<String>(token) {
+                let message_id = initial_message_ids.get(token).unwrap().lastMessage.id;
+                json_room
+                    .update_if_id_is_newer(
+                        message_id,
+                        Some((*initial_message_ids.get(token).unwrap()).clone()),
+                    )
+                    .await?;
+                rooms.insert(token.clone(), json_room);
+                initial_message_ids.remove(token);
+            } else {
+                log::warn!("Room was deleted upstream, failed to locate!");
+                //TODO: remove old chat log!!
+            }
+        }
+        Ok(())
     }
 
     async fn new_room(
@@ -110,39 +140,18 @@ impl NCTalk {
         let mut rooms = HashMap::<String, NCRoom>::new();
 
         if path.exists() {
-            if let Ok(mut data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
+            if let Ok(data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
                 std::fs::read_to_string(path).unwrap().as_str(),
             ) {
-                let mut handles = HashMap::new();
-                for (token, room) in &mut data {
-                    handles.insert(
-                        token.clone(),
-                        tokio::spawn(NCRoom::new(
-                            room.clone(),
-                            requester.clone(),
-                            notify.clone(),
-                            chat_log_path.clone(),
-                        )),
-                    );
-                }
-                for (token, room_future) in &mut handles {
-                    //we can safely unwrap here bc the json file on disk shall never be this broken.
-                    let mut json_room = room_future.await?.unwrap();
-                    if initial_message_ids.contains_key::<String>(token) {
-                        let message_id = initial_message_ids.get(token).unwrap().lastMessage.id;
-                        json_room
-                            .update_if_id_is_newer(
-                                message_id,
-                                Some((*initial_message_ids.get(token).unwrap()).clone()),
-                            )
-                            .await?;
-                        rooms.insert(token.clone(), json_room);
-                        initial_message_ids.remove(token);
-                    } else {
-                        log::warn!("Room was deleted upstream, failed to locate!");
-                        //TODO: remove old chat log!!
-                    }
-                }
+                NCTalk::parse_files(
+                    data,
+                    &requester,
+                    &notify,
+                    chat_log_path.as_path(),
+                    &mut initial_message_ids,
+                    &mut rooms,
+                )
+                .await?;
                 if !initial_message_ids.is_empty() {
                     let remaining_room_data = response
                         .iter()
@@ -295,7 +304,7 @@ impl NCBackend for NCTalk {
                     NCRoomTypes::NoteToSelf,
                     NCRoomTypes::ChangeLog,
                 ]
-                .contains(&room.get_room_type())
+                .contains(room.get_room_type())
             })
             .map(|(key, _)| (key.clone(), self.rooms[key].to_string()))
             .sorted_by(|(token_a, _), (token_b, _)| self.rooms[token_a].cmp(&self.rooms[token_b]))
