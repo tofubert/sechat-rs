@@ -40,7 +40,6 @@ pub struct NCReqDataUser {
     shareWithDisplayNameUnique: String,
 }
 
-
 fn str_or_status<'de, D>(deserializer: D) -> Result<NCReqDataUserStatus, D::Error>
 where
     D: Deserializer<'de>,

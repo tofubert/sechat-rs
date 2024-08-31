@@ -1,7 +1,7 @@
 use crate::{
     backend::{
         nc_notify::NCNotify,
-        nc_request::{NCReqDataRoom, NCRequest},
+        nc_request::{NCReqDataRoom, NCRequest, NCRequestInterface},
         nc_room::NCRoomInterface,
     },
     config::{self},
@@ -48,7 +48,7 @@ pub struct NCTalk {
 impl NCTalk {
     async fn parse_response(
         response: Vec<NCReqDataRoom>,
-        requester: NCRequest,
+        requester: impl NCRequestInterface,
         notifier: NCNotify,
         rooms: &mut HashMap<String, NCRoom>,
         chat_log_path: PathBuf,
@@ -72,7 +72,7 @@ impl NCTalk {
     }
     async fn parse_files(
         mut data: HashMap<String, NCReqDataRoom>,
-        requester: &NCRequest,
+        requester: &impl NCRequestInterface,
         notify: &NCNotify,
         chat_log_path: &Path,
         initial_message_ids: &mut HashMap<String, &NCReqDataRoom>,
@@ -113,7 +113,7 @@ impl NCTalk {
 
     async fn new_room(
         packaged_child: NCReqDataRoom,
-        requester_box: NCRequest,
+        requester_box: impl NCRequestInterface,
         notifier: NCNotify,
         chat_log_path: PathBuf,
     ) -> (String, Option<NCRoom>) {
@@ -122,7 +122,7 @@ impl NCTalk {
             NCRoom::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
-    pub async fn new(requester: NCRequest) -> Result<NCTalk, Box<dyn Error>> {
+    pub async fn new(requester: impl NCRequestInterface) -> Result<NCTalk, Box<dyn Error>> {
         let notify = NCNotify::new();
 
         let chat_log_path = config::get().get_server_data_dir();
@@ -438,47 +438,11 @@ impl std::fmt::Display for MockNCTalk {
 
 #[cfg(test)]
 mod tests {
-    // use crate::backend::nc_room::MockNCRoomInterface;
+    use super::NCTalk;
 
-    // use super::*;
-
-    // #[derive(Debug, Default)]
-    // pub struct MockBackend {
-    //     pub current_token: String,
-    //     pub room: HashMap<String, Box<dyn NCRoomInterface>>,
-    // }
-
-    // impl<'a, Room> NCBackend<'a, Room> for MockBackend<'a, Room> {
-    //     fn get_room(&self, token: &str) -> &Room {}
-    //     fn get_current_room(&self, token: &str) -> &Room {}
-    //     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
-    //         Ok(())
-    //     }
-    //     fn get_current_room_token(&self) -> &str {}
-    //     fn get_unread_rooms(&self) -> Vec<String> {
-    //         vec![]
-    //     }
-    //     fn get_room_by_displayname(&self, name: &str) -> &str {}
-    //     fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
-    //         vec![]
-    //     }
-    //     fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
-    //         vec![]
-    //     }
-    //     fn get_room_keys(&self) -> Vec<&String> {
-    //         self.rooms.keys().collect::<Vec<&String>>()
-    //     }
-    // }
-    // #[async_trait]
-    // impl NCBackendAsync for MockBackend {
-    //     async fn send_message(&mut self, _message: String) -> Result<(), Box<dyn Error>> {
-    //         Ok(())
-    //     }
-    //     async fn select_room(&mut self, _token: String) -> Result<(), Box<dyn Error>> {
-    //         Ok(())
-    //     }
-    //     async fn update_rooms(&mut self, _force_update: bool) -> Result<(), Box<dyn Error>> {
-    //         Ok(())
-    //     }
-    // }
+    #[test]
+    fn create_backend() {
+        let mock_requester = crate::backend::nc_request::MockNCRequestInterface::new();
+        let backend = NCTalk::new(mock_requester);
+    }
 }

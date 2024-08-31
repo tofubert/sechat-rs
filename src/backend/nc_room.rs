@@ -1,7 +1,9 @@
 use super::{
     nc_message::NCMessage,
     nc_notify::NCNotify,
-    nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequest},
+    nc_request::{
+        NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequest, NCRequestInterface,
+    },
 };
 use async_trait::async_trait;
 use log;
@@ -70,7 +72,7 @@ pub struct NCRoom {
 impl NCRoom {
     pub async fn new(
         room_data: NCReqDataRoom,
-        requester: NCRequest,
+        requester: impl NCRequestInterface,
         notifier: NCNotify,
         path_to_log: std::path::PathBuf,
     ) -> Option<NCRoom> {
