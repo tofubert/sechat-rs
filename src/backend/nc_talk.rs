@@ -404,7 +404,8 @@ use mockall::{mock, predicate::*};
 #[cfg(test)]
 mock! {
     #[derive(Debug)]
-    pub NCTalk{}
+    pub NCTalk{
+    }
     #[async_trait]
     impl NCBackend for NCTalk{
         type Room = MockNCRoomInterface;
@@ -423,10 +424,15 @@ mock! {
         fn add_room(&mut self, room_option: Option<<MockNCTalk as NCBackend>::Room>);
     }
 }
+
+#[cfg(test)]
+static BUTZ: &str = "Butz";
+
 #[cfg(test)]
 impl std::fmt::Display for MockNCTalk {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self)
+        let self_name = BUTZ.to_string();
+        write!(f, "{self_name}")
     }
 }
 

@@ -28,6 +28,7 @@ use mockall::{automock, predicate::*};
 pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     fn get_last_room_level_message_id(&self) -> Option<i32>;
     fn has_unread(&self) -> bool;
+    #[allow(dead_code)]
     fn is_dm(&self) -> bool;
     fn is_group(&self) -> bool;
     fn get_messages(&self) -> &Vec<NCMessage>;
@@ -37,6 +38,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     fn get_users(&self) -> &Vec<NCReqDataParticipants>;
     fn get_room_type(&self) -> &NCRoomTypes;
 
+    #[allow(dead_code)]
     fn to_json(&self) -> String;
     fn to_data(&self) -> NCReqDataRoom;
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
@@ -375,20 +377,21 @@ mod tests {
 
     impl PartialOrd for MockNCRoomInterface {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.cmp(other))
+            Some(self.to_string().cmp(&other.to_string()))
         }
     }
 
     impl PartialEq for MockNCRoomInterface {
         fn eq(&self, other: &Self) -> bool {
-            self == other
+            self.to_string() == other.to_string()
         }
     }
 
     impl Eq for MockNCRoomInterface {}
     impl std::fmt::Display for MockNCRoomInterface {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self)
+            let self_name = BUTZ.to_string();
+            write!(f, "{self_name}")
         }
     }
 }

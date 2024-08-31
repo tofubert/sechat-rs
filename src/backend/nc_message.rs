@@ -51,6 +51,7 @@ impl NCMessage {
         &self.0
     }
 
+    #[allow(dead_code)]
     /// return `true` if message is a comment
     pub fn is_comment(&self) -> bool {
         self.0.messageType == "comment"
@@ -76,6 +77,7 @@ impl NCMessage {
         self.is_system() && self.0.systemMessage == "reaction"
     }
 
+    #[allow(dead_code)]
     /// return `true` if message is a command
     pub fn is_command(&self) -> bool {
         self.0.messageType == "command"
