@@ -19,8 +19,17 @@ pub enum NCRoomTypes {
     NoteToSelf,
 }
 
+impl Default for NCRoomTypes {
+    fn default() -> Self {
+        NCRoomTypes::OneToOne
+    }
+}
+#[cfg(test)]
+use mockall::{automock, predicate::*};
+
+#[cfg_attr(test, automock)]
 #[async_trait]
-pub trait NCRoomInterface: Debug + Send + Display + Ord {
+pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     fn get_last_room_level_message_id(&self) -> Option<i32>;
     fn has_unread(&self) -> bool;
     fn is_dm(&self) -> bool;
@@ -39,17 +48,17 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord {
     async fn update_if_id_is_newer(
         &mut self,
         message_id: i32,
-        data_option: Option<&NCReqDataRoom>,
+        data_option: Option<NCReqDataRoom>,
     ) -> Result<(), Box<dyn std::error::Error>>;
     async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>>;
     async fn update(
         &mut self,
-        data_option: Option<&NCReqDataRoom>,
+        data_option: Option<NCReqDataRoom>,
     ) -> Result<(), Box<dyn std::error::Error>>;
     async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NCRoom {
     requester: NCRequest,
     notifier: NCNotify,
@@ -123,7 +132,6 @@ impl NCRoom {
 
 #[async_trait]
 impl NCRoomInterface for NCRoom {
-
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
@@ -239,7 +247,7 @@ impl NCRoomInterface for NCRoom {
 
     async fn update(
         &mut self,
-        data_option: Option<&NCReqDataRoom>,
+        data_option: Option<NCReqDataRoom>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(data) = data_option {
             self.room_data = data.clone();
@@ -289,7 +297,7 @@ impl NCRoomInterface for NCRoom {
     async fn update_if_id_is_newer(
         &mut self,
         message_id: i32,
-        data_option: Option<&NCReqDataRoom>,
+        data_option: Option<NCReqDataRoom>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         use std::cmp::Ordering;
 
@@ -350,5 +358,41 @@ impl std::ops::Deref for NCRoom {
 
     fn deref(&self) -> &Self::Target {
         &self.room_data.displayName
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    static BUTZ: &str = "Butz";
+    impl std::ops::Deref for MockNCRoomInterface {
+        type Target = str;
+        fn deref(&self) -> &Self::Target {
+            BUTZ
+        }
+    }
+    impl Ord for MockNCRoomInterface {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.to_string().cmp(&other.to_string())
+        }
+    }
+
+    impl PartialOrd for MockNCRoomInterface {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+
+    impl PartialEq for MockNCRoomInterface {
+        fn eq(&self, other: &Self) -> bool {
+            self == other
+        }
+    }
+
+    impl Eq for MockNCRoomInterface {}
+    impl std::fmt::Display for MockNCRoomInterface {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self)
+        }
     }
 }

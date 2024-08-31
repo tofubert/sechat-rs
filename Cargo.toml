@@ -20,6 +20,10 @@ exclude = [
   "tags",
 ]
 
+[dev-dependencies]
+mockall = { version = "0.13.0" }
+mockall_derive = { version = "0.13.0"}
+
 [dependencies]
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }

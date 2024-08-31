@@ -139,9 +139,7 @@ enum ProcessEventResult {
     Exit,
 }
 
-pub async fn run(
-    nc_backend: NCTalk,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn std::error::Error>> {
     install_hooks()?;
 
     // create app and run it
@@ -259,10 +257,7 @@ async fn handle_key_in_editing<'a>(
     Ok(())
 }
 
-fn handle_key_in_help<'a>(
-    key: KeyEvent,
-    app: &mut App<'a, NCTalk>,
-) {
+fn handle_key_in_help<'a>(key: KeyEvent, app: &mut App<'a, NCTalk>) {
     match key.code {
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,

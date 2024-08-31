@@ -74,21 +74,37 @@ impl<'a> StatefulWidget for &Users<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::backend::{
+        nc_request::NCReqDataParticipants, nc_room::MockNCRoomInterface, nc_talk::MockNCTalk,
+    };
     use backend::TestBackend;
 
     use super::*;
 
     #[test]
     fn render_users() {
+        let mut mock_nc_backend = MockNCTalk::new();
         let backend = TestBackend::new(10, 10);
         let mut terminal = Terminal::new(backend).unwrap();
-        let users = Users::new();
+        let mut users = Users::new();
+
+        let mut mock_room = MockNCRoomInterface::new();
+        let mut dummy_user = NCReqDataParticipants::default();
+        dummy_user.displayName = "Butz".to_string();
+        mock_room.expect_get_users().return_const(vec![dummy_user]);
+        mock_nc_backend
+            .expect_get_current_room()
+            .once()
+            .return_const(mock_room);
+        users.update(&mock_nc_backend);
+
         terminal
             .draw(|frame| users.render_area(frame, Rect::new(0, 0, 8, 8)))
             .unwrap();
+
         let mut expected = Buffer::with_lines([
             "│Users    ",
-            "│         ",
+            "│Butz     ",
             "│         ",
             "│         ",
             "│         ",
@@ -102,6 +118,9 @@ mod tests {
 
         for x in 1..=7 {
             expected[(x, 0)].set_style(Style::new().green().on_black().bold());
+        }
+        for x in 1..=7 {
+            expected[(x, 1)].set_style(Style::new().white().on_black().bold());
         }
 
         terminal.backend().assert_buffer(&expected);

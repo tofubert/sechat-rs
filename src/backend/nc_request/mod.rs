@@ -22,7 +22,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, error::Error};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NCRequest {
     base_url: String,
     client: Client,
