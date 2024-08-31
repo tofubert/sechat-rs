@@ -351,3 +351,16 @@ impl NCRequest {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn new_requester() {
+        let _ = config::init("./test/");
+        let result = NCRequest::new();
+        assert!(result.is_ok());
+        let requester = result.unwrap();
+    }
+}

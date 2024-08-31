@@ -15,7 +15,7 @@ pub struct Config {
     strategy: Xdg,
 }
 
-pub fn init(path_arg: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "org".to_string(),
         author: "emlix".to_string(),
@@ -68,7 +68,7 @@ pub fn init(path_arg: &str) -> Result<(), Box<dyn std::error::Error>> {
                     .expect("Failed to make config path into string")
             );
             Data::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
-            return Err(Box::new(why));
+            return Err(eyre!(why));
         }
     };
 
@@ -77,9 +77,7 @@ pub fn init(path_arg: &str) -> Result<(), Box<dyn std::error::Error>> {
     config.set_strategy(strategy);
     CONFIG
         .set(config)
-        .map_err(|config| eyre!("failed to set config {config:?}"))
-        .expect("Could not set global config!");
-    Ok(())
+        .map_err(|config| eyre!("Failed to set config {config:?}"))
 }
 
 /// Get the application configuration.
@@ -200,8 +198,6 @@ impl Config {
 mod tests {
     use super::*;
 
-    // The ordering of these tests is important since we set the static CONFIG object!
-
     #[test]
     #[should_panic(expected = "config not initialized")]
     fn get_config_before_init() {
@@ -217,7 +213,8 @@ mod tests {
 
     #[test]
     fn default_values() {
-        assert!(init("./test/").is_ok());
+        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let _ = init("./test/");
         assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
         assert!(get()
             .get_server_data_dir()
