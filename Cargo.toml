@@ -20,9 +20,6 @@ exclude = [
   "tags",
 ]
 
-[build]
-target = ["x86_64-unknown-linux-gnu", "i686-unknown-linux-gnu"]
-
 [dependencies]
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
@@ -55,6 +52,7 @@ libc = "0.2.158"
 strip-ansi-escapes = "0.2.0"
 tracing = "0.1.40"
 cfg-if = "1.0.0"
+tui-textarea = "0.6.1"
 
 [lints.clippy]
 pedantic = "warn"

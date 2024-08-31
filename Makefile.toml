@@ -10,6 +10,10 @@ alias = "ci"
 description = "Run continuous integration tasks"
 dependencies = ["lint", "clippy", "check", "test"]
 
+[tasks.all]
+description = "Run all tasks"
+dependencies = ["lint", "clippy", "check", "audit", "build", "coverage-text"]
+
 
 [tasks.clippy]
 description = "Run Clippy for linting"
@@ -29,7 +33,7 @@ args = [
 
 [tasks.lint]
 description = "Lint code style (formatting, typos, docs, markdown)"
-dependencies = ["lint-format"]
+dependencies = ["lint-format", "lint-typos"]
 
 [tasks.lint-format]
 description = "Lint code formatting"
@@ -65,6 +69,13 @@ args = [
   "--lcov",
   "--output-path",
   "target/lcov.info",
+]
+
+[tasks.coverage-text]
+description = "Generate code coverage report"
+command = "cargo"
+args = [
+  "llvm-cov",
 ]
 
 [tasks.build]

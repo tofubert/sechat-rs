@@ -15,7 +15,7 @@ pub struct Config {
     strategy: Xdg,
 }
 
-pub fn init(path_arg: &str) {
+pub fn init(path_arg: &str) -> Result<(), Box<dyn std::error::Error>> {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "org".to_string(),
         author: "emlix".to_string(),
@@ -68,7 +68,7 @@ pub fn init(path_arg: &str) {
                     .expect("Failed to make config path into string")
             );
             Data::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
-            exit(-1);
+            return Err(Box::new(why));
         }
     };
 
@@ -79,6 +79,7 @@ pub fn init(path_arg: &str) {
         .set(config)
         .map_err(|config| eyre!("failed to set config {config:?}"))
         .expect("Could not set global config!");
+    Ok(())
 }
 
 /// Get the application configuration.
@@ -197,28 +198,61 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use super::*;
+
+    // The ordering of these tests is important since we set the static CONFIG object!
 
     #[test]
     #[should_panic(expected = "config not initialized")]
     fn get_config_before_init() {
-        super::get();
+        get();
     }
     #[test]
     #[should_panic(
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
     )]
     fn init_with_faulty_path() {
-        super::init("/test");
+        assert!(init("/bogus_test/path").is_err());
+    }
+
+    #[test]
+    fn default_values() {
+        assert!(init("./test/").is_ok());
+        assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
+        assert!(get()
+            .get_server_data_dir()
+            .ends_with(".local/share/sechat-rs/MyNCInstance"));
+        assert!(get()
+            .get_http_dump_dir()
+            .expect("Not Https Dump Dir found")
+            .ends_with(".local/share/sechat-rs"));
+        assert!(get().get_enable_mouse());
+        assert!(get().get_enable_paste());
     }
     #[test]
-    fn init_with_no_path() {
-        super::init("");
+    fn init_logging() {
+        let conf = Config::default();
+        conf.config_logging();
     }
+
     #[test]
-    #[should_panic(expected = "Could not set global config!: failed to set config Config")]
-    fn init_config_twice() {
-        super::init("");
-        super::init("");
+    fn update_data() {
+        let mut conf = Config::default();
+        conf.set_config_data(Data::default());
+        conf.set_strategy(
+            choose_app_strategy(AppStrategyArgs {
+                top_level_domain: "org".to_string(),
+                author: "emlix".to_string(),
+                app_name: "sechat-rs".to_string(),
+            })
+            .unwrap(),
+        );
+        assert!(conf.get_data_dir().ends_with(".local/share/sechat-rs"));
+        assert!(conf
+            .get_server_data_dir()
+            .ends_with(".local/share/sechat-rs"));
+        assert!(conf.get_http_dump_dir().is_none());
+        assert!(!conf.get_enable_mouse());
+        assert!(!conf.get_enable_paste());
     }
 }
