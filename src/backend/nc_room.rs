@@ -2,7 +2,7 @@ use super::{
     nc_message::NCMessage,
     nc_notify::NCNotify,
     nc_request::{
-        NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequest, NCRequestInterface,
+        NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequestInterface,
     },
 };
 use async_trait::async_trait;
@@ -59,8 +59,8 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
 }
 
 #[derive(Debug, Default)]
-pub struct NCRoom {
-    requester: NCRequest,
+pub struct NCRoom <Requester: NCRequestInterface+ 'static + std::marker::Sync>{
+    requester: Requester,
     notifier: NCNotify,
     pub messages: Vec<NCMessage>,
     room_data: NCReqDataRoom,
@@ -69,13 +69,13 @@ pub struct NCRoom {
     participants: Vec<NCReqDataParticipants>,
 }
 
-impl NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> NCRoom <Requester>{
     pub async fn new(
         room_data: NCReqDataRoom,
-        requester: impl NCRequestInterface,
+        requester: Requester,
         notifier: NCNotify,
         path_to_log: std::path::PathBuf,
-    ) -> Option<NCRoom> {
+    ) -> Option<NCRoom::<Requester>> {
         let mut tmp_path_buf = path_to_log.clone();
         tmp_path_buf.push(room_data.token.as_str());
         let path = tmp_path_buf.as_path();
@@ -92,13 +92,13 @@ impl NCRoom {
                     "Failed to parse json for {}, falling back to fetching",
                     room_data.displayName
                 );
-                NCRoom::fetch_messages(&requester, &room_data.token, &mut messages)
+                NCRoom::<Requester>::fetch_messages(&requester, &room_data.token, &mut messages)
                     .await
                     .ok();
             }
         } else {
             log::debug!("No Log File found for room {}", room_data.displayName);
-            NCRoom::fetch_messages(&requester, &room_data.token, &mut messages)
+            NCRoom::<Requester>::fetch_messages(&requester, &room_data.token, &mut messages)
                 .await
                 .ok();
         }
@@ -118,7 +118,7 @@ impl NCRoom {
         })
     }
     async fn fetch_messages(
-        requester: &NCRequest,
+        requester: &Requester,
         token: &str,
         messages: &mut Vec<NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -131,7 +131,7 @@ impl NCRoom {
 }
 
 #[async_trait]
-impl NCRoomInterface for NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> NCRoomInterface for NCRoom<Requester> {
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
@@ -327,33 +327,33 @@ impl NCRoomInterface for NCRoom {
     }
 }
 
-impl Ord for NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> Ord for NCRoom<Requester> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.to_string().cmp(other)
     }
 }
 
-impl PartialOrd for NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> PartialOrd for NCRoom<Requester> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> PartialEq for NCRoom<Requester> {
     fn eq(&self, other: &Self) -> bool {
         self.as_str() == other.as_str()
     }
 }
 
-impl Eq for NCRoom {}
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> Eq for NCRoom<Requester>{}
 
-impl std::fmt::Display for NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> std::fmt::Display for NCRoom<Requester> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
 
-impl std::ops::Deref for NCRoom {
+impl<Requester: NCRequestInterface+ 'static + std::marker::Sync> std::ops::Deref for NCRoom<Requester> {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
