@@ -36,8 +36,8 @@ pub trait NCBackend: Debug + Send + Default {
 }
 
 #[derive(Debug, Default)]
-pub struct NCTalk<Requester: NCRequestInterface+ 'static + std::marker::Sync> {
-    rooms: HashMap<String, NCRoom::<Requester>>,
+pub struct NCTalk<Requester: NCRequestInterface + 'static + std::marker::Sync> {
+    rooms: HashMap<String, NCRoom<Requester>>,
     chat_data_path: PathBuf,
     last_requested: i64,
     requester: Requester,
@@ -45,12 +45,12 @@ pub struct NCTalk<Requester: NCRequestInterface+ 'static + std::marker::Sync> {
     pub current_room_token: String,
 }
 
-impl<Requester: NCRequestInterface+ 'static + std::marker::Send> NCTalk<Requester> {
+impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Requester> {
     async fn parse_response(
         response: Vec<NCReqDataRoom>,
         requester: Requester,
         notifier: NCNotify,
-        rooms: &mut HashMap<String, NCRoom::<Requester>>,
+        rooms: &mut HashMap<String, NCRoom<Requester>>,
         chat_log_path: PathBuf,
     ) {
         let v = response.into_iter().map(|child| {
@@ -76,7 +76,7 @@ impl<Requester: NCRequestInterface+ 'static + std::marker::Send> NCTalk<Requeste
         notify: &NCNotify,
         chat_log_path: &Path,
         initial_message_ids: &mut HashMap<String, &NCReqDataRoom>,
-        rooms: &mut HashMap<String, NCRoom::<Requester>>,
+        rooms: &mut HashMap<String, NCRoom<Requester>>,
     ) -> Result<(), Box<dyn Error>> {
         let mut handles = HashMap::new();
         for (token, room) in &mut data {
@@ -116,13 +116,13 @@ impl<Requester: NCRequestInterface+ 'static + std::marker::Send> NCTalk<Requeste
         requester_box: Requester,
         notifier: NCNotify,
         chat_log_path: PathBuf,
-    ) -> (String, Option<NCRoom::<Requester>>) {
+    ) -> (String, Option<NCRoom<Requester>>) {
         (
             packaged_child.token.clone(),
             NCRoom::<Requester>::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
-    pub async fn new(requester: Requester) -> Result<NCTalk::<Requester>, Box<dyn Error>> {
+    pub async fn new(requester: Requester) -> Result<NCTalk<Requester>, Box<dyn Error>> {
         let notify = NCNotify::new();
 
         let chat_log_path = config::get().get_server_data_dir();
@@ -137,7 +137,7 @@ impl<Requester: NCRequestInterface+ 'static + std::marker::Send> NCTalk<Requeste
             .map(|room| (room.token.clone(), room))
             .collect::<HashMap<String, &NCReqDataRoom>>();
 
-        let mut rooms = HashMap::<String, NCRoom::<Requester>>::new();
+        let mut rooms = HashMap::<String, NCRoom<Requester>>::new();
 
         if path.exists() {
             if let Ok(data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
@@ -220,8 +220,8 @@ impl<Requester: NCRequestInterface+ 'static + std::marker::Send> NCTalk<Requeste
 }
 
 #[async_trait]
-impl<Requester: NCRequestInterface + 'static  + std::marker::Sync> NCBackend for NCTalk<Requester> {
-    type Room = NCRoom::<Requester>;
+impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for NCTalk<Requester> {
+    type Room = NCRoom<Requester>;
     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
@@ -439,16 +439,38 @@ impl std::fmt::Display for MockNCTalk {
 #[cfg(test)]
 mod tests {
     use super::NCTalk;
-    use crate::config::init;
+    use crate::{backend::nc_request::NCReqDataRoom, config::init};
 
     #[tokio::test]
     async fn create_backend() {
         let _ = init("./test/");
 
-        let mock_requester = crate::backend::nc_request::MockNCRequest::new();
-        let backend = NCTalk::new(mock_requester).await.expect("Failed to create Backend");
+        let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
+        let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
+        let mock_requester_fetch = crate::backend::nc_request::MockNCRequest::new();
+        let mock_requester_room = crate::backend::nc_request::MockNCRequest::new();
+
+        mock_requester
+            .expect_fetch_rooms_initial()
+            .once()
+            .returning_st(move || {
+                let mut default_room = NCReqDataRoom::default();
+                default_room.displayName = "General".to_string();
+                Ok((vec![default_room], 0))
+            });
+        mock_requester_file
+            .expect_clone()
+            .return_once_st(|| mock_requester_fetch);
+        mock_requester
+            .expect_clone()
+            .return_once_st(|| mock_requester_file);
+
+        mock_requester
+            .expect_clone()
+            .return_once_st(|| mock_requester_room);
+        let backend = NCTalk::new(mock_requester)
+            .await
+            .expect("Failed to create Backend");
         assert_eq!(backend.rooms.len(), 0);
-        
-        
     }
 }

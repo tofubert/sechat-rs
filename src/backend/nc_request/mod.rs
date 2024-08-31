@@ -28,7 +28,7 @@ use std::{collections::HashMap, error::Error};
 use mockall::{mock, predicate::*};
 
 #[async_trait]
-pub trait NCRequestInterface: Debug + Send + Clone + Default + Send + Sync{
+pub trait NCRequestInterface: Debug + Send + Clone + Default + Send + Sync {
     async fn send_message(
         &self,
         message: String,
