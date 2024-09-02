@@ -127,10 +127,12 @@ pub fn restore() -> eyre::Result<()> {
     if config::get().get_enable_mouse() {
         execute!(stdout(), DisableMouseCapture)?;
     }
-    //proceed here regardless of error, since this will fail if the terminal doesnt support this.
+
+    //proceed here regardless of error, since this will fail if the terminal doesn't support this.
     let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
     execute!(stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
+
     Ok(())
 }
 
