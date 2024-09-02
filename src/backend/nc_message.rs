@@ -2,7 +2,7 @@ use super::nc_request::NCReqDataMessage;
 use chrono::prelude::*;
 
 /// `NextCloud` message interface
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NCMessage(NCReqDataMessage);
 
 impl From<NCReqDataMessage> for NCMessage {

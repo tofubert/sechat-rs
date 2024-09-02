@@ -12,7 +12,7 @@ dependencies = ["lint", "clippy", "check", "test"]
 
 [tasks.all]
 description = "Run all tasks"
-dependencies = ["lint", "clippy", "check", "audit", "build", "coverage-text"]
+dependencies = ["format", "lint-typos", "clippy", "check", "audit", "build", "coverage-text"]
 
 
 [tasks.clippy]
@@ -81,7 +81,7 @@ args = [
 [tasks.build]
 command = "cargo"
 args = ["build"]
-dependencies = ["format", "clippy", "audit"]
+dependencies = ["lint-format", "clippy", "audit"]
 
 [tasks.test]
 command = "cargo"
