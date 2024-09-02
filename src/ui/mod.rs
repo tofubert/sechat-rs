@@ -72,7 +72,7 @@ fn install_color_eyre_panic_hook(panic_hook: PanicHook) {
             error!("Unable to restore terminal: {err:?}");
         }
 
-        // not sure about this
+        // TODO not sure about this
         // let msg = format!("{}", panic_hook.panic_report(panic_info));
         // error!("Error: {}", strip_ansi_escapes::strip_str(msg));
         panic_hook(panic_info);
