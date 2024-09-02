@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Cell, HighlightSpacing, Row, Table, TableState},
@@ -28,25 +29,30 @@ impl<'a> Users<'a> {
         frame.render_stateful_widget(self, area, &mut self.state.clone());
     }
     pub fn update(&mut self, backend: &impl NCBackend) {
-        self.user_list.clear();
-        let mut new_users = backend.get_current_room().get_users().clone();
-        new_users.sort_by(|user1, user2| user1.displayName.cmp(&user2.displayName));
-        for user in new_users {
-            let mut cell = Cell::new(user.displayName.to_string());
-            if let Some(status) = user.status {
-                cell = match status.as_str() {
-                    "away" => cell.set_style(Style::new().blue()),
-                    "offline" => cell.set_style(Style::new().gray()),
-                    "dnd" => cell.set_style(Style::new().red()),
-                    "online" => cell.set_style(Style::new().green()),
-                    unknown => {
-                        log::debug!("Unknown Status {unknown}");
-                        cell.set_style(Style::new())
+        self.user_list = backend
+            .get_current_room()
+            .get_users()
+            .iter()
+            .sorted_by(|user1, user2| user1.displayName.cmp(&user2.displayName))
+            .map(|user| {
+                Row::new([{
+                    if let Some(status) = &user.status {
+                        Cell::new(user.displayName.to_string()).set_style(match status.as_str() {
+                            "away" => Style::new().blue(),
+                            "offline" => Style::new().gray(),
+                            "dnd" => Style::new().red(),
+                            "online" => Style::new().green(),
+                            unknown => {
+                                log::debug!("Unknown Status {unknown}");
+                                Style::new()
+                            }
+                        })
+                    } else {
+                        Cell::new(user.displayName.to_string())
                     }
-                }
-            };
-            self.user_list.push(Row::new([cell]));
-        }
+                }])
+            })
+            .collect();
 
         self.state = TableState::default().with_offset(0).with_selected(0);
     }
