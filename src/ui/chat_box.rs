@@ -135,11 +135,14 @@ impl<'a> ChatBox<'a> {
             position,
             self.state.selected().ok_or("nothing selected")?
         );
+
         // let new_selection = state.selected().ok_or("nothing selected")?;
         // self.current_index = position
         //     .y
         //     .clamp(0, (self.messages.len() - 1).try_into()?)
         //     .try_into()?;
+        todo!("commented code missing?");
+
         Ok(())
     }
 }
