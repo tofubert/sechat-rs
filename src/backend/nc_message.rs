@@ -23,7 +23,12 @@ impl NCMessage {
 
     /// return opponent display name
     pub fn get_name(&self) -> &str {
-        &self.0.actorDisplayName
+        if !self.is_comment() || self.is_system() || self.is_comment_deleted() || self.is_command()
+        {
+            "System"
+        } else {
+            &self.0.actorDisplayName
+        }
     }
 
     /// return the message itself

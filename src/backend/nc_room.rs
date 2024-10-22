@@ -80,7 +80,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
 
         let mut messages = Vec::<NCMessage>::new();
 
-        if path.exists() {
+        if path.exists() && path.is_file() {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
                 std::fs::read_to_string(path).unwrap().as_str(),
             ) {

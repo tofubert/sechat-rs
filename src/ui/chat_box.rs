@@ -141,9 +141,8 @@ impl<'a> ChatBox<'a> {
         //     .y
         //     .clamp(0, (self.messages.len() - 1).try_into()?)
         //     .try_into()?;
+        // Ok(())
         todo!("commented code missing?");
-
-        Ok(())
     }
 }
 
