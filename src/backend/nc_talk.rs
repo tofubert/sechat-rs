@@ -437,52 +437,70 @@ impl std::fmt::Display for MockNCTalk {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::NCTalk;
-//     use crate::{
-//         backend::nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom},
-//         config::init,
-//     };
+#[cfg(test)]
+mod tests {
+    use super::NCTalk;
+    use crate::{
+        backend::nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom},
+        config::init,
+    };
 
-//     #[tokio::test]
-//     async fn create_backend() {
-//         let _ = init("./test/");
+    #[tokio::test]
+    async fn create_backend() {
+        let _ = init("./test/");
 
-//         let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
-//         let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
-//         let mut mock_requester_fetch = crate::backend::nc_request::MockNCRequest::new();
-//         let mock_requester_room = crate::backend::nc_request::MockNCRequest::new();
+        let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
+        let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
+        let mut mock_requester_fetch = crate::backend::nc_request::MockNCRequest::new();
+        let mock_requester_room = crate::backend::nc_request::MockNCRequest::new();
 
-//         mock_requester
-//             .expect_fetch_rooms_initial()
-//             .once()
-//             .returning_st(move || {
-//                 let mut default_room = NCReqDataRoom::default();
-//                 default_room.displayName = "General".to_string();
-//                 Ok((vec![default_room], 0))
-//             });
-//         mock_requester_fetch
-//             .expect_fetch_chat_initial()
-//             .return_once_st(|_, _| Ok(vec![NCReqDataMessage::default()]));
-//         mock_requester_fetch
-//             .expect_fetch_participants()
-//             .return_once_st(|_| Ok(vec![NCReqDataParticipants::default()]));
-//         mock_requester_file
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_fetch);
+        let default_room = NCReqDataRoom {
+            displayName: "General".to_string(),
+            roomtype: 2, // Group Chat
+            ..Default::default()
+        };
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_file);
+        let default_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 1,
+            ..Default::default()
+        };
+        let update_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 2,
+            ..Default::default()
+        };
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_room);
+        mock_requester
+            .expect_fetch_rooms_initial()
+            .once()
+            .returning_st(move || Ok((vec![default_room.clone()], 0)));
+        mock_requester_fetch
+            .expect_fetch_chat_initial()
+            .return_once_st(move |_, _| Ok(vec![default_message.clone()]));
+        mock_requester_fetch
+            .expect_fetch_participants()
+            .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
 
-//         let backend = NCTalk::new(mock_requester)
-//             .await
-//             .expect("Failed to create Backend");
-//         assert_eq!(backend.rooms.len(), 0);
-//     }
-// }
+        mock_requester_fetch
+            .expect_fetch_chat_update()
+            .return_once_st(move |_, _, _| Ok(vec![update_message.clone()]));
+
+        mock_requester_file
+            .expect_clone()
+            .return_once_st(|| mock_requester_fetch);
+
+        mock_requester
+            .expect_clone()
+            .return_once_st(|| mock_requester_file);
+
+        mock_requester
+            .expect_clone()
+            .return_once_st(|| mock_requester_room);
+
+        let backend = NCTalk::new(mock_requester)
+            .await
+            .expect("Failed to create Backend");
+        assert_eq!(backend.rooms.len(), 1);
+    }
+}
