@@ -1,35 +1,60 @@
 use crate::{
     backend::{
         nc_notify::NCNotify,
-        nc_request::{NCReqDataRoom, NCRequest},
-        nc_room::{NCRoom, NCRoomTypes},
+        nc_request::{NCReqDataRoom, NCRequestInterface},
+        nc_room::NCRoomInterface,
     },
     config::{self},
 };
-use core::panic;
+use async_trait::async_trait;
 use itertools::Itertools;
-use std::{collections::HashMap, error::Error, path::PathBuf};
+use std::{
+    collections::HashMap,
+    error::Error,
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 
-#[derive(Debug)]
-pub struct NCTalk {
-    rooms: HashMap<String, NCRoom>,
+use super::nc_room::{NCRoom, NCRoomTypes};
+
+#[async_trait]
+pub trait NCBackend: Debug + Send + Default {
+    type Room: NCRoomInterface;
+    fn write_to_log(&mut self) -> Result<(), std::io::Error>;
+    fn get_current_room_token(&self) -> &str;
+    fn get_room(&self, token: &str) -> &Self::Room;
+    fn get_current_room(&self) -> &Self::Room;
+    fn get_unread_rooms(&self) -> Vec<String>;
+    fn get_room_by_displayname(&self, name: &str) -> String;
+    fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+    fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+    fn get_room_keys(&self) -> Vec<&'_ String>;
+    async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>>;
+    async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>>;
+    async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
+    fn add_room(&mut self, room_option: Option<Self::Room>);
+}
+
+#[derive(Debug, Default)]
+pub struct NCTalk<Requester: NCRequestInterface + 'static + std::marker::Sync> {
+    rooms: HashMap<String, NCRoom<Requester>>,
     chat_data_path: PathBuf,
     last_requested: i64,
-    requester: NCRequest,
+    requester: Requester,
     notifier: NCNotify,
     pub current_room_token: String,
 }
 
-impl NCTalk {
+impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Requester> {
     async fn parse_response(
         response: Vec<NCReqDataRoom>,
-        requester: NCRequest,
+        requester: Requester,
         notifier: NCNotify,
-        rooms: &mut HashMap<String, NCRoom>,
+        rooms: &mut HashMap<String, NCRoom<Requester>>,
         chat_log_path: PathBuf,
     ) {
         let v = response.into_iter().map(|child| {
-            tokio::spawn(NCTalk::new_room(
+            tokio::spawn(NCTalk::<Requester>::new_room(
                 child,
                 requester.clone(),
                 notifier.clone(),
@@ -45,20 +70,59 @@ impl NCTalk {
             }
         }
     }
+    async fn parse_files(
+        mut data: HashMap<String, NCReqDataRoom>,
+        requester: &Requester,
+        notify: &NCNotify,
+        chat_log_path: &Path,
+        initial_message_ids: &mut HashMap<String, &NCReqDataRoom>,
+        rooms: &mut HashMap<String, NCRoom<Requester>>,
+    ) -> Result<(), Box<dyn Error>> {
+        let mut handles = HashMap::new();
+        for (token, room) in &mut data {
+            handles.insert(
+                token.clone(),
+                tokio::spawn(NCRoom::<Requester>::new(
+                    room.clone(),
+                    requester.clone(),
+                    notify.clone(),
+                    chat_log_path.to_path_buf(),
+                )),
+            );
+        }
+        for (token, room_future) in &mut handles {
+            //we can safely unwrap here bc the json file on disk shall never be this broken.
+            let mut json_room = room_future.await?.unwrap();
+            if initial_message_ids.contains_key::<String>(token) {
+                let message_id = initial_message_ids.get(token).unwrap().lastMessage.id;
+                json_room
+                    .update_if_id_is_newer(
+                        message_id,
+                        Some((*initial_message_ids.get(token).unwrap()).clone()),
+                    )
+                    .await?;
+                rooms.insert(token.clone(), json_room);
+                initial_message_ids.remove(token);
+            } else {
+                log::warn!("Room was deleted upstream, failed to locate!");
+                //TODO: remove old chat log!!
+            }
+        }
+        Ok(())
+    }
 
     async fn new_room(
         packaged_child: NCReqDataRoom,
-        requester_box: NCRequest,
+        requester_box: Requester,
         notifier: NCNotify,
         chat_log_path: PathBuf,
-    ) -> (String, Option<NCRoom>) {
+    ) -> (String, Option<NCRoom<Requester>>) {
         (
             packaged_child.token.clone(),
-            NCRoom::new(packaged_child, requester_box, notifier, chat_log_path).await,
+            NCRoom::<Requester>::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
-
-    pub async fn new(requester: NCRequest) -> Result<NCTalk, Box<dyn Error>> {
+    pub async fn new(requester: Requester) -> Result<NCTalk<Requester>, Box<dyn Error>> {
         let notify = NCNotify::new();
 
         let chat_log_path = config::get().get_server_data_dir();
@@ -73,49 +137,28 @@ impl NCTalk {
             .map(|room| (room.token.clone(), room))
             .collect::<HashMap<String, &NCReqDataRoom>>();
 
-        let mut rooms = HashMap::<String, NCRoom>::new();
+        let mut rooms = HashMap::<String, NCRoom<Requester>>::new();
 
         if path.exists() {
-            if let Ok(mut data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
+            if let Ok(data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
                 std::fs::read_to_string(path).unwrap().as_str(),
             ) {
-                let mut handles = HashMap::new();
-                for (token, room) in &mut data {
-                    handles.insert(
-                        token.clone(),
-                        tokio::spawn(NCRoom::new(
-                            room.clone(),
-                            requester.clone(),
-                            notify.clone(),
-                            chat_log_path.clone(),
-                        )),
-                    );
-                }
-                for (token, room_future) in &mut handles {
-                    //we can safely unwrap here bc the json file on disk shall never be this broken.
-                    let mut json_room = room_future.await?.unwrap();
-                    if initial_message_ids.contains_key(token) {
-                        let message_id = initial_message_ids.get(token).unwrap().lastMessage.id;
-                        json_room
-                            .update_if_id_is_newer(
-                                message_id,
-                                Some(initial_message_ids.get(token).unwrap()),
-                            )
-                            .await?;
-                        rooms.insert(token.clone(), json_room);
-                        initial_message_ids.remove(token);
-                    } else {
-                        log::warn!("Room was deleted upstream, failed to locate!");
-                        //TODO: remove old chat log!!
-                    }
-                }
+                NCTalk::parse_files(
+                    data,
+                    &requester,
+                    &notify,
+                    chat_log_path.as_path(),
+                    &mut initial_message_ids,
+                    &mut rooms,
+                )
+                .await?;
                 if !initial_message_ids.is_empty() {
                     let remaining_room_data = response
                         .iter()
                         .filter(|data| initial_message_ids.contains_key(&data.token))
                         .cloned()
                         .collect::<Vec<NCReqDataRoom>>();
-                    NCTalk::parse_response(
+                    NCTalk::<Requester>::parse_response(
                         remaining_room_data,
                         requester.clone(),
                         notify.clone(),
@@ -131,7 +174,7 @@ impl NCTalk {
                 log::info!("Loaded Rooms from log files");
             } else {
                 log::debug!("Failed to parse top level json, falling back to fetching");
-                NCTalk::parse_response(
+                NCTalk::<Requester>::parse_response(
                     response,
                     requester.clone(),
                     notify.clone(),
@@ -142,7 +185,7 @@ impl NCTalk {
             }
         } else {
             log::debug!("No Log files found in Path, fetching logs from server.");
-            NCTalk::parse_response(
+            NCTalk::<Requester>::parse_response(
                 response,
                 requester.clone(),
                 notify.clone(),
@@ -160,16 +203,26 @@ impl NCTalk {
             requester,
             notifier: notify,
         };
-        let current_token = talk.get_room_by_displayname(&config::get().data.ui.default_room);
-        log::info!("Entering default room {}", current_token.to_string());
-        talk.select_room(current_token.to_token()).await?;
+        log::info!(
+            "Entering default room {}",
+            &config::get().data.ui.default_room
+        );
+        talk.select_room(
+            talk.get_room_by_displayname(&config::get().data.ui.default_room)
+                .to_string(),
+        )
+        .await?;
 
         log::debug!("Found {} Rooms", talk.rooms.len());
 
         Ok(talk)
     }
+}
 
-    pub fn write_to_log(&mut self) -> Result<(), std::io::Error> {
+#[async_trait]
+impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for NCTalk<Requester> {
+    type Room = NCRoom<Requester>;
+    fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
         let mut data = HashMap::<String, NCReqDataRoom>::new();
@@ -212,39 +265,37 @@ impl NCTalk {
         }
     }
 
-    pub fn get_current_room(&self) -> &NCRoom {
+    fn get_current_room_token(&self) -> &str {
+        self.current_room_token.as_str()
+    }
+
+    fn get_current_room(&self) -> &Self::Room {
         &self.rooms[&self.current_room_token]
     }
 
-    pub fn get_room_by_token(&self, token: &String) -> &NCRoom {
+    fn get_room(&self, token: &str) -> &Self::Room {
         &self.rooms[token]
     }
 
-    pub fn get_unread_rooms(&self) -> Vec<String> {
+    fn get_unread_rooms(&self) -> Vec<String> {
         self.rooms
             .values()
             .filter(|room| room.has_unread() && self.current_room_token != room.to_token())
             .sorted_by(std::cmp::Ord::cmp)
-            .map(NCRoom::to_token)
+            .map(NCRoomInterface::to_token)
             .collect::<Vec<String>>()
     }
 
-    pub fn get_room_by_displayname(&self, name: &String) -> &NCRoom {
+    fn get_room_by_displayname(&self, name: &str) -> String {
         for room in self.rooms.values() {
             if room.to_string() == *name {
-                return room;
+                return room.to_token();
             }
         }
         panic!("room doesnt exist {}", name);
     }
 
-    pub fn add_room(&mut self, room_option: Option<NCRoom>) {
-        if let Some(room) = room_option {
-            self.rooms.insert(room.to_token(), room);
-        }
-    }
-
-    pub fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
+    fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)> {
         self.rooms
             .iter()
             .filter(|(_, room)| {
@@ -253,38 +304,32 @@ impl NCTalk {
                     NCRoomTypes::NoteToSelf,
                     NCRoomTypes::ChangeLog,
                 ]
-                .contains(&room.room_type)
+                .contains(room.get_room_type())
             })
             .map(|(key, _)| (key.clone(), self.rooms[key].to_string()))
-            .sorted_by(|(token_a, _), (token_b, _)| {
-                self.get_room_by_token(token_a)
-                    .cmp(self.get_room_by_token(token_b))
-            })
+            .sorted_by(|(token_a, _), (token_b, _)| self.rooms[token_a].cmp(&self.rooms[token_b]))
             .collect_vec()
     }
 
-    pub fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
+    fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)> {
         let mut mapping: Vec<(String, String)> = Vec::new();
         for (key, room) in &self.rooms {
-            match room.room_type {
+            match room.get_room_type() {
                 NCRoomTypes::Group | NCRoomTypes::Public => {
                     mapping.push((key.clone(), self.rooms[key].to_string()));
                 }
                 _ => {}
             }
         }
-        mapping.sort_by(|(token_a, _), (token_b, _)| {
-            self.get_room_by_token(token_a)
-                .cmp(self.get_room_by_token(token_b))
-        });
+        mapping.sort_by(|(token_a, _), (token_b, _)| self.rooms[token_a].cmp(&self.rooms[token_b]));
         mapping
     }
 
-    pub fn get_room_keys(&self) -> Vec<&String> {
+    fn get_room_keys(&self) -> Vec<&String> {
         self.rooms.keys().collect::<Vec<&String>>()
     }
 
-    pub async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>> {
+    async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>> {
         self.rooms
             .get(&self.current_room_token)
             .ok_or("Room not found when it should be there")?
@@ -297,16 +342,17 @@ impl NCTalk {
             .await
     }
 
-    pub async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>> {
+    async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>> {
         self.current_room_token.clone_from(&token);
+        log::debug!("key {}", token);
         self.rooms
             .get_mut(&self.current_room_token)
-            .ok_or("Failed to get Room ref")?
+            .ok_or_else(|| format!("Failed to get Room ref for room selection: {token}."))?
             .update(None)
             .await
     }
 
-    pub async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>> {
+    async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>> {
         let (response, timestamp) = if force_update {
             self.requester
                 .fetch_rooms_update(self.last_requested)
@@ -320,12 +366,12 @@ impl NCTalk {
                 let room_ref = self
                     .rooms
                     .get_mut(room.token.as_str())
-                    .ok_or("Failed to get Room ref.")?;
+                    .ok_or("Failed to get Room ref for update.")?;
                 if force_update {
-                    room_ref.update(Some(&room)).await?;
+                    room_ref.update(Some(room)).await?;
                 } else {
                     room_ref
-                        .update_if_id_is_newer(room.lastMessage.id, Some(&room))
+                        .update_if_id_is_newer(room.lastMessage.id, Some(room))
                         .await?;
                 }
             } else {
@@ -342,5 +388,120 @@ impl NCTalk {
             }
         }
         Ok(())
+    }
+
+    fn add_room(&mut self, room_option: Option<Self::Room>) {
+        if let Some(room) = room_option {
+            self.rooms.insert(room.to_token(), room);
+        }
+    }
+}
+
+#[cfg(test)]
+use crate::backend::nc_room::MockNCRoomInterface;
+#[cfg(test)]
+use mockall::{mock, predicate::*};
+
+#[cfg(test)]
+mock! {
+    #[derive(Debug)]
+    pub NCTalk{
+    }
+    #[async_trait]
+    impl NCBackend for NCTalk{
+        type Room = MockNCRoomInterface;
+        fn write_to_log(&mut self) -> Result<(), std::io::Error>;
+        fn get_current_room_token(&self) -> &str;
+        fn get_room(&self, token: &str) -> &<MockNCTalk as NCBackend>::Room;
+        fn get_current_room(&self) -> &<MockNCTalk as NCBackend>::Room;
+        fn get_unread_rooms(&self) -> Vec<String>;
+        fn get_room_by_displayname(&self, name: &str) -> String;
+        fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+        fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+        fn get_room_keys<'a>(&'a self) -> Vec<&'a String>;
+        async fn send_message(& mut self, message: String) -> Result<(), Box<dyn Error>>;
+        async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>>;
+        async fn update_rooms(& mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
+        fn add_room(&mut self, room_option: Option<<MockNCTalk as NCBackend>::Room>);
+    }
+}
+
+#[cfg(test)]
+static BUTZ: &str = "Butz";
+
+#[cfg(test)]
+impl std::fmt::Display for MockNCTalk {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let self_name = BUTZ.to_string();
+        write!(f, "{self_name}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NCTalk;
+    use crate::{
+        backend::nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom},
+        config::init,
+    };
+
+    #[tokio::test]
+    async fn create_backend() {
+        let _ = init("./test/");
+
+        let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
+        let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
+        let mut mock_requester_fetch = crate::backend::nc_request::MockNCRequest::new();
+        let mock_requester_room = crate::backend::nc_request::MockNCRequest::new();
+
+        let default_room = NCReqDataRoom {
+            displayName: "General".to_string(),
+            roomtype: 2, // Group Chat
+            ..Default::default()
+        };
+
+        let default_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 1,
+            ..Default::default()
+        };
+        let update_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 2,
+            ..Default::default()
+        };
+
+        mock_requester
+            .expect_fetch_rooms_initial()
+            .once()
+            .returning_st(move || Ok((vec![default_room.clone()], 0)));
+        mock_requester_fetch
+            .expect_fetch_chat_initial()
+            .return_once_st(move |_, _| Ok(vec![default_message.clone()]));
+        mock_requester_fetch
+            .expect_fetch_participants()
+            .times(2)
+            .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
+
+        mock_requester_fetch
+            .expect_fetch_chat_update()
+            .return_once_st(move |_, _, _| Ok(vec![update_message.clone()]));
+
+        mock_requester_file
+            .expect_clone()
+            .return_once_st(|| mock_requester_fetch);
+
+        mock_requester
+            .expect_clone()
+            .return_once_st(|| mock_requester_file);
+
+        mock_requester
+            .expect_clone()
+            .return_once_st(|| mock_requester_room);
+
+        let backend = NCTalk::new(mock_requester)
+            .await
+            .expect("Failed to create Backend");
+        assert_eq!(backend.rooms.len(), 1);
     }
 }

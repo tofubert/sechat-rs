@@ -20,6 +20,10 @@ exclude = [
   "tags",
 ]
 
+[dev-dependencies]
+mockall = { version = "0.13.0" }
+mockall_derive = { version = "0.13.0"}
+
 [dependencies]
 reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
@@ -28,7 +32,7 @@ serde_json = "1.0"
 jzon = "*"
 base64 = "*"
 toml = "*"
-toml-example = "0.11.1"
+toml-example = "0.12.0"
 ratatui = {version = "0.28", features = ["serde"] }
 crossterm = "*"
 tui-tree-widget = "0.22"
@@ -40,19 +44,20 @@ log = "*"
 log4rs = "1.3"
 notify-rust = "4.11"
 itertools = "*"
-clap = { version = "4.5.16", features = ["derive"] }
+clap = { version = "4.5.20", features = ["derive"] }
 strum = "0.26"
 strum_macros = "0.26"
 textwrap = "0.16.1"
 etcetera = "0.8.0"
 better-panic = "0.3.0"
 color-eyre = "0.6.3"
-human-panic = "2.0.1"
-libc = "0.2.158"
+human-panic = "2.0.2"
+libc = "0.2.161"
 strip-ansi-escapes = "0.2.0"
 tracing = "0.1.40"
 cfg-if = "1.0.0"
 tui-textarea = "0.6.1"
+async-trait = "0.1.83"
 
 [lints.clippy]
 pedantic = "warn"

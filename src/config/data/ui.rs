@@ -9,6 +9,9 @@ pub struct Ui {
     pub default_room: String,
     pub categories: Vec<String>,
     pub categories_separator: String,
+    /// Should the userlist be shown in rooms by default?
+    #[toml_example(default = true)]
+    pub user_sidebar_default: bool,
     #[toml_example(default = true)]
     pub use_mouse: bool,
     #[toml_example(default = true)]

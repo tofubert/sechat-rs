@@ -13,6 +13,7 @@ pub use nc_req_data_user::*;
 pub use nc_request_ocs_wrapper::*;
 
 use crate::config;
+use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
 use reqwest::{
@@ -20,9 +21,47 @@ use reqwest::{
     Client, Response, Url,
 };
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::{collections::HashMap, error::Error};
 
-#[derive(Debug, Clone)]
+#[cfg(test)]
+use mockall::{mock, predicate::*};
+
+#[async_trait]
+pub trait NCRequestInterface: Debug + Send + Clone + Default + Send + Sync {
+    async fn send_message(
+        &self,
+        message: String,
+        token: &str,
+    ) -> Result<NCReqDataMessage, Box<dyn Error>>;
+    async fn fetch_autocomplete_users(
+        &self,
+        name: &str,
+    ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>>;
+    async fn fetch_participants(
+        &self,
+        token: &str,
+    ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>>;
+    async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+    async fn fetch_rooms_update(
+        &self,
+        last_timestamp: i64,
+    ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+    async fn fetch_chat_initial(
+        &self,
+        token: &str,
+        maxMessage: i32,
+    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+    async fn fetch_chat_update(
+        &self,
+        token: &str,
+        maxMessage: i32,
+        last_message: i32,
+    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+    async fn mark_chat_read(&self, token: &str, last_message: i32) -> Result<(), Box<dyn Error>>;
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct NCRequest {
     base_url: String,
     client: Client,
@@ -80,105 +119,6 @@ impl NCRequest {
         })
     }
 
-    pub async fn send_message(
-        &self,
-        message: String,
-        token: &str,
-    ) -> Result<NCReqDataMessage, Box<dyn Error>> {
-        let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
-        let params = HashMap::from([("message", message)]);
-        let url = Url::parse_with_params(&url_string, params)?;
-        let response = self.request_post(url).await?;
-
-        match response.status() {
-            reqwest::StatusCode::CREATED => Ok(response
-                .json::<NCReqOCSWrapper<NCReqDataMessage>>()
-                .await?
-                .ocs
-                .data),
-            _ => Err(Box::new(
-                response
-                    .error_for_status()
-                    .err()
-                    .ok_or("Failed to convert Err in reqwest")?,
-            )),
-        }
-    }
-
-    pub async fn fetch_autocomplete_users(
-        &self,
-        name: &str,
-    ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>> {
-        let url_string = self.base_url.clone() + "/ocs/v2.php/core/autocomplete/get";
-        let params = HashMap::from([("limit", "200"), ("search", name)]);
-        let url = Url::parse_with_params(&url_string, params)?;
-        let response = self.request(url).await?;
-
-        match response.status() {
-            reqwest::StatusCode::OK => {
-                let text = response.text().await?;
-                match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataUser>>>(&text) {
-                    Ok(parser_response) => Ok(parser_response.ocs.data),
-                    Err(why) => {
-                        self.dump_json_to_log(&url_string, &text)?;
-                        log::debug!("{} with {:?}", url_string, why);
-                        Err(Box::new(why))
-                    }
-                }
-            }
-            _ => Err(Box::new(
-                response
-                    .error_for_status()
-                    .err()
-                    .ok_or("Failed to convert Err in reqwest")?,
-            )),
-        }
-    }
-
-    pub async fn fetch_participants(
-        &self,
-        token: &str,
-    ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>> {
-        let url_string = self.base_url.clone()
-            + "/ocs/v2.php/apps/spreed/api/v4/room/"
-            + token
-            + "/participants";
-        let params = HashMap::from([("includeStatus", "true")]);
-        let url = Url::parse_with_params(&url_string, params)?;
-
-        let response = self.request(url).await?;
-        match response.status() {
-            reqwest::StatusCode::OK => {
-                let text = response.text().await?;
-                match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataParticipants>>>(&text) {
-                    Ok(parser_response) => Ok(parser_response.ocs.data),
-                    Err(why) => {
-                        self.dump_json_to_log(&url_string, &text)?;
-                        log::debug!("{} with {:?}", url_string, why);
-                        Err(Box::new(why))
-                    }
-                }
-            }
-            _ => Err(Box::new(
-                response
-                    .error_for_status()
-                    .err()
-                    .ok_or("Failed to convert Err in reqwest")?,
-            )),
-        }
-    }
-
-    pub async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
-        self.request_rooms(None).await
-    }
-
-    pub async fn fetch_rooms_update(
-        &self,
-        last_timestamp: i64,
-    ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
-        self.request_rooms(Some(last_timestamp)).await
-    }
-
     async fn request_rooms(
         &self,
         last_timestamp: Option<i64>,
@@ -214,39 +154,6 @@ impl NCRequest {
                     .err()
                     .ok_or("Failed to convert Err in reqwest")?,
             )),
-        }
-    }
-
-    pub async fn fetch_chat_initial(
-        &self,
-        token: &str,
-        maxMessage: i32,
-    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
-        let response_result = self.request_chat(token, maxMessage, None).await;
-        // Initial results come last to first. And we want the latest message always to be at the end.
-        match response_result {
-            Ok(Some(mut response)) => {
-                response.reverse();
-                Ok(response)
-            }
-            Ok(None) => Err(String::from("Room disappeared, precondition not met error.").into()),
-            Err(why) => Err(why),
-        }
-    }
-
-    pub async fn fetch_chat_update(
-        &self,
-        token: &str,
-        maxMessage: i32,
-        last_message: i32,
-    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
-        let response_result = self
-            .request_chat(token, maxMessage, Some(last_message))
-            .await;
-        match response_result {
-            Ok(Some(response)) => Ok(response),
-            Ok(None) => Err(String::from("Room disappeared, precondition not met error.").into()),
-            Err(why) => Err(why),
         }
     }
 
@@ -305,27 +212,6 @@ impl NCRequest {
         }
     }
 
-    pub async fn mark_chat_read(
-        &self,
-        token: &str,
-        last_message: i32,
-    ) -> Result<(), Box<dyn Error>> {
-        let url_string =
-            self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token + "/read";
-        let url = Url::parse(&url_string)?;
-        log::debug!("Marking {} as read", token);
-        let response = self.request_post(url).await?;
-        match response.status() {
-            reqwest::StatusCode::OK => Ok(()),
-            _ => Err(Box::new(
-                response
-                    .error_for_status()
-                    .err()
-                    .ok_or("Failed to convert Error")?,
-            )),
-        }
-    }
-
     async fn request_post(&self, url: Url) -> Result<Response, reqwest::Error> {
         let builder = self.client.post(url);
         builder.send().await
@@ -349,6 +235,201 @@ impl NCRequest {
             file.write_all(pretty_text.as_bytes())?;
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl NCRequestInterface for NCRequest {
+    async fn send_message(
+        &self,
+        message: String,
+        token: &str,
+    ) -> Result<NCReqDataMessage, Box<dyn Error>> {
+        let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
+        let params = HashMap::from([("message", message)]);
+        let url = Url::parse_with_params(&url_string, params)?;
+        let response = self.request_post(url).await?;
+
+        match response.status() {
+            reqwest::StatusCode::CREATED => Ok(response
+                .json::<NCReqOCSWrapper<NCReqDataMessage>>()
+                .await?
+                .ocs
+                .data),
+            _ => Err(Box::new(
+                response
+                    .error_for_status()
+                    .err()
+                    .ok_or("Failed to convert Err in reqwest")?,
+            )),
+        }
+    }
+
+    async fn fetch_autocomplete_users(
+        &self,
+        name: &str,
+    ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>> {
+        let url_string = self.base_url.clone() + "/ocs/v2.php/core/autocomplete/get";
+        let params = HashMap::from([("limit", "200"), ("search", name)]);
+        let url = Url::parse_with_params(&url_string, params)?;
+        let response = self.request(url).await?;
+
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                let text = response.text().await?;
+                match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataUser>>>(&text) {
+                    Ok(parser_response) => Ok(parser_response.ocs.data),
+                    Err(why) => {
+                        self.dump_json_to_log(&url_string, &text)?;
+                        log::debug!("{} with {:?}", url_string, why);
+                        Err(Box::new(why))
+                    }
+                }
+            }
+            _ => Err(Box::new(
+                response
+                    .error_for_status()
+                    .err()
+                    .ok_or("Failed to convert Err in reqwest")?,
+            )),
+        }
+    }
+
+    async fn fetch_participants(
+        &self,
+        token: &str,
+    ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>> {
+        let url_string = self.base_url.clone()
+            + "/ocs/v2.php/apps/spreed/api/v4/room/"
+            + token
+            + "/participants";
+        let params = HashMap::from([("includeStatus", "true")]);
+        let url = Url::parse_with_params(&url_string, params)?;
+
+        let response = self.request(url).await?;
+        match response.status() {
+            reqwest::StatusCode::OK => {
+                let text = response.text().await?;
+                match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataParticipants>>>(&text) {
+                    Ok(parser_response) => Ok(parser_response.ocs.data),
+                    Err(why) => {
+                        self.dump_json_to_log(&url_string, &text)?;
+                        log::debug!("{} with {:?}", url_string, why);
+                        Err(Box::new(why))
+                    }
+                }
+            }
+            _ => Err(Box::new(
+                response
+                    .error_for_status()
+                    .err()
+                    .ok_or("Failed to convert Err in reqwest")?,
+            )),
+        }
+    }
+
+    async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
+        self.request_rooms(None).await
+    }
+
+    async fn fetch_rooms_update(
+        &self,
+        last_timestamp: i64,
+    ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
+        self.request_rooms(Some(last_timestamp)).await
+    }
+
+    async fn fetch_chat_initial(
+        &self,
+        token: &str,
+        maxMessage: i32,
+    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
+        let response_result = self.request_chat(token, maxMessage, None).await;
+        // Initial results come last to first. And we want the latest message always to be at the end.
+        match response_result {
+            Ok(Some(mut response)) => {
+                response.reverse();
+                Ok(response)
+            }
+            Ok(None) => Err(String::from("Room disappeared, precondition not met error.").into()),
+            Err(why) => Err(why),
+        }
+    }
+
+    async fn fetch_chat_update(
+        &self,
+        token: &str,
+        maxMessage: i32,
+        last_message: i32,
+    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
+        let response_result = self
+            .request_chat(token, maxMessage, Some(last_message))
+            .await;
+        match response_result {
+            Ok(Some(response)) => Ok(response),
+            Ok(None) => Err(String::from("Room disappeared, precondition not met error.").into()),
+            Err(why) => Err(why),
+        }
+    }
+
+    async fn mark_chat_read(&self, token: &str, last_message: i32) -> Result<(), Box<dyn Error>> {
+        let url_string =
+            self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token + "/read";
+        let url = Url::parse(&url_string)?;
+        log::debug!("Marking {} as read", token);
+        let response = self.request_post(url).await?;
+        match response.status() {
+            reqwest::StatusCode::OK => Ok(()),
+            _ => Err(Box::new(
+                response
+                    .error_for_status()
+                    .err()
+                    .ok_or("Failed to convert Error")?,
+            )),
+        }
+    }
+}
+
+#[cfg(test)]
+mock! {
+    #[derive(Debug, Default, Clone)]
+    pub NCRequest {}     // Name of the mock struct, less the "Mock" prefix
+
+    #[async_trait]
+    impl NCRequestInterface for NCRequest {
+        async fn send_message(
+            &self,
+            message: String,
+            token: &str,
+        ) -> Result<NCReqDataMessage, Box<dyn Error>>;
+        async fn fetch_autocomplete_users(
+            &self,
+            name: &str,
+        ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>>;
+        async fn fetch_participants(
+            &self,
+            token: &str,
+        ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>>;
+        async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+        async fn fetch_rooms_update(
+            &self,
+            last_timestamp: i64,
+        ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+        async fn fetch_chat_initial(
+            &self,
+            token: &str,
+            maxMessage: i32,
+        ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+        async fn fetch_chat_update(
+            &self,
+            token: &str,
+            maxMessage: i32,
+            last_message: i32,
+        ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+        async fn mark_chat_read(&self, token: &str, last_message: i32) -> Result<(), Box<dyn Error>>;
+    }
+    impl Clone for NCRequest {   // specification of the trait to mock
+        fn clone(&self) -> Self;
     }
 }
 

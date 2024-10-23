@@ -19,6 +19,7 @@ impl Widget for &HelpBox {
                 vec![
                     Row::new(["q", "quit", "enter the quit screen."]),
                     Row::new(["o", "open", "enter the chat selection screen."]),
+                    Row::new(["u", "users sidebar", "Toggle whether the users are shown in a chat sidebar. Available in reading mode."]),
                     Row::new(["?", "help", "enter this help screen."]),
                     Row::new([
                         "m",

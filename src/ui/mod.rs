@@ -4,9 +4,11 @@ pub mod chat_selector;
 pub mod help_box;
 pub mod input_box;
 pub mod title_bar;
+pub mod users;
+
+use crate::backend::{nc_request::NCRequest, nc_talk::NCTalk};
 
 use super::{
-    backend::nc_talk::NCTalk,
     config,
     ui::app::{App, CurrentScreen},
 };
@@ -70,7 +72,7 @@ fn install_color_eyre_panic_hook(panic_hook: PanicHook) {
             error!("Unable to restore terminal: {err:?}");
         }
 
-        // not sure about this
+        // TODO not sure about this
         // let msg = format!("{}", panic_hook.panic_report(panic_info));
         // error!("Error: {}", strip_ansi_escapes::strip_str(msg));
         panic_hook(panic_info);
@@ -125,10 +127,12 @@ pub fn restore() -> eyre::Result<()> {
     if config::get().get_enable_mouse() {
         execute!(stdout(), DisableMouseCapture)?;
     }
-    //proceed here regardless of error, since this will fail if the terminal doesnt support this.
+
+    //proceed here regardless of error, since this will fail if the terminal doesn't support this.
     let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
     execute!(stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
+
     Ok(())
 }
 
@@ -137,7 +141,7 @@ enum ProcessEventResult {
     Exit,
 }
 
-pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn run(nc_backend: NCTalk<NCRequest>) -> Result<(), Box<dyn std::error::Error>> {
     install_hooks()?;
 
     // create app and run it
@@ -153,7 +157,7 @@ pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn std::error::Error>> {
 
 async fn run_app<B: Backend>(
     mut terminal: Terminal<B>,
-    mut app: App<'_>,
+    mut app: App<'_, NCTalk<NCRequest>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     app.select_room().await?;
     log::debug!("Entering Main Loop");
@@ -176,7 +180,7 @@ async fn run_app<B: Backend>(
 }
 
 async fn process_event(
-    app: &mut App<'_>,
+    app: &mut App<'_, NCTalk<NCRequest>>,
     event: Event,
 ) -> Result<ProcessEventResult, Box<dyn std::error::Error>> {
     // It's guaranteed that `read` won't block, because `poll` returned
@@ -213,7 +217,7 @@ async fn process_event(
 
 async fn handle_key_in_opening(
     key: KeyEvent,
-    app: &mut App<'_>,
+    app: &mut App<'_, NCTalk<NCRequest>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
@@ -236,7 +240,7 @@ async fn handle_key_in_opening(
 
 async fn handle_key_in_editing(
     key: Input,
-    app: &mut App<'_>,
+    app: &mut App<'_, NCTalk<NCRequest>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key {
         Input { key: Key::Esc, .. } => app.current_screen = CurrentScreen::Reading,
@@ -255,7 +259,7 @@ async fn handle_key_in_editing(
     Ok(())
 }
 
-fn handle_key_in_help(key: KeyEvent, app: &mut App) {
+fn handle_key_in_help(key: KeyEvent, app: &mut App<'_, NCTalk<NCRequest>>) {
     match key.code {
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
@@ -266,7 +270,7 @@ fn handle_key_in_help(key: KeyEvent, app: &mut App) {
 
 fn handle_key_in_exit(
     key: KeyEvent,
-    app: &mut App,
+    app: &mut App<'_, NCTalk<NCRequest>>,
 ) -> Option<Result<ProcessEventResult, Box<dyn std::error::Error>>> {
     match key.code {
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
@@ -287,7 +291,7 @@ fn handle_key_in_exit(
 
 async fn handle_key_in_reading(
     key: KeyEvent,
-    app: &mut App<'_>,
+    app: &mut App<'_, NCTalk<NCRequest>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -300,6 +304,7 @@ async fn handle_key_in_reading(
         KeyCode::Char('o') => app.current_screen = CurrentScreen::Opening,
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
+        KeyCode::Char('u') => app.toggle_user_sidebar(),
         _ => (),
     };
     Ok(())
