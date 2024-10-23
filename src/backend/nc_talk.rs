@@ -480,6 +480,7 @@ mod tests {
             .return_once_st(move |_, _| Ok(vec![default_message.clone()]));
         mock_requester_fetch
             .expect_fetch_participants()
+            .times(2)
             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
 
         mock_requester_fetch

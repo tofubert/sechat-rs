@@ -41,7 +41,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: taiki-e/install-action@cargo-make
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo make audit
+      - run: cargo make deny
+
 
   clippy:
     runs-on: ubuntu-latest
