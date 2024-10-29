@@ -1,4 +1,4 @@
-use crate::backend::nc_talk::NCTalk;
+use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -27,23 +27,24 @@ impl<'a> ChatBox<'a> {
         }
     }
 
-    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &NCTalk) {
-        let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10) / 5 * 4;
+    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &impl NCBackend) {
+        let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
             self.update_messages(backend);
         }
     }
 
-    pub fn update_messages(&mut self, backend: &NCTalk) {
+    pub fn update_messages(&mut self, backend: &impl NCBackend) {
         use itertools::Itertools;
         use std::convert::TryInto;
 
         self.messages.clear();
-        for message_data in
-            backend.get_current_room().messages.iter().filter(|mes| {
-                !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted()
-            })
+        for message_data in backend
+            .get_current_room()
+            .get_messages()
+            .iter()
+            .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
         {
             let name = textwrap::wrap(
                 message_data.get_name(),
@@ -134,12 +135,14 @@ impl<'a> ChatBox<'a> {
             position,
             self.state.selected().ok_or("nothing selected")?
         );
+
         // let new_selection = state.selected().ok_or("nothing selected")?;
         // self.current_index = position
         //     .y
         //     .clamp(0, (self.messages.len() - 1).try_into()?)
         //     .try_into()?;
-        Ok(())
+        // Ok(())
+        todo!("commented code missing?");
     }
 }
 

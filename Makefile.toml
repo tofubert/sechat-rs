@@ -12,7 +12,7 @@ dependencies = ["lint", "clippy", "check", "test"]
 
 [tasks.all]
 description = "Run all tasks"
-dependencies = ["lint", "clippy", "check", "audit", "build", "coverage-text"]
+dependencies = ["format", "lint-typos", "clippy", "check", "dependencies", "build", "coverage-text"]
 
 
 [tasks.clippy]
@@ -50,10 +50,20 @@ description = "Run typo checks"
 install_crate = { crate_name = "typos-cli", binary = "typos", test_arg = "--version" }
 command = "typos"
 
+[tasks.dependencies]
+description = "Lint code style (formatting, typos, docs, markdown)"
+dependencies = ["audit", "deny"]
+
 [tasks.audit]
 command = "cargo"
 install_crate = "cargo-audit"
 args = ["audit", "-D", "warnings"]
+
+
+[tasks.deny]
+command = "cargo"
+install_crate = "cargo-deny"
+args = ["deny", "check", "bans", "licenses"]
 
 
 [tasks.check]
@@ -81,7 +91,7 @@ args = [
 [tasks.build]
 command = "cargo"
 args = ["build"]
-dependencies = ["format", "clippy", "audit"]
+dependencies = ["lint-format", "clippy", "audit"]
 
 [tasks.test]
 command = "cargo"
