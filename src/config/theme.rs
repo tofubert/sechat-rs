@@ -14,6 +14,10 @@ pub struct Theme {
     /// Default Text Colour
     #[serde_as(as = "DisplayFromStr")]
     pub foreground: Color,
+    #[serde_as(as = "DisplayFromStr")]
+    pub backround_highlight: Color,
+    #[serde_as(as = "DisplayFromStr")]
+    pub foreground_highlight: Color,
 
     /// Backround for unread message highlight
     #[serde_as(as = "DisplayFromStr")]
@@ -49,6 +53,11 @@ pub struct Theme {
 impl Theme {
     pub fn default_style(&self) -> Style {
         Style::new().fg(self.foreground).bg(self.backround)
+    }
+    pub fn default_highlight_style(&self) -> Style {
+        Style::new()
+            .fg(self.foreground_highlight)
+            .bg(self.backround_highlight)
     }
     pub fn user_away_style(&self) -> Style {
         Style::new().fg(self.user_away).bg(self.backround)
@@ -89,6 +98,8 @@ impl Default for Theme {
         Self {
             backround: Color::DarkGray,
             foreground: Color::White,
+            backround_highlight: Color::Gray,
+            foreground_highlight: Color::White,
             user_away: Color::Blue,
             user_dnd: Color::Red,
             user_offline: Color::Gray,
