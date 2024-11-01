@@ -1,3 +1,4 @@
+use crate::config::get_theme;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders},
@@ -12,7 +13,11 @@ pub struct InputBox<'a> {
 impl<'a> InputBox<'a> {
     pub fn new(initial_message: &str) -> InputBox<'a> {
         let mut textarea = TextArea::new(vec![initial_message.into()]);
-        textarea.set_block(Block::default().borders(Borders::TOP));
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::TOP)
+                .style(get_theme().default_style()),
+        );
         InputBox { textarea }
     }
 

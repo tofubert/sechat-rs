@@ -106,7 +106,7 @@ impl Default for Theme {
             user_online: Color::Green,
             backround_unread_message: Color::from_str("#6e6a86").unwrap(),
             foreground_unread_message: Color::from_str("#e0def4").unwrap(),
-            table_header: Color::from_str("#e0def4").unwrap(),
+            table_header: Color::Blue,
             foreground_titlebar: Color::White,
             backround_important_titlebar: Color::Red,
             foreground_important_titlebar: Color::White,
