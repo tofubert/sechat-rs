@@ -40,13 +40,13 @@ impl<'a> Users<'a> {
                 Row::new([{
                     if let Some(status) = &user.status {
                         Cell::new(user.displayName.to_string()).set_style(match status.as_str() {
-                            "away" => Style::new().fg(config::get().theme.user_away),
-                            "offline" => Style::new().fg(config::get().theme.user_offline),
-                            "dnd" => Style::new().fg(config::get().theme.user_dnd),
-                            "online" => Style::new().fg(config::get().theme.user_online),
+                            "away" => config::get_theme().user_away_style(),
+                            "offline" => config::get_theme().user_offline_style(),
+                            "dnd" => config::get_theme().user_dnd_style(),
+                            "online" => config::get_theme().user_online_style(),
                             unknown => {
                                 log::debug!("Unknown Status {unknown}");
-                                Style::new()
+                                config::get_theme().default_style()
                             }
                         })
                     } else {

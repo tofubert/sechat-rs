@@ -94,6 +94,10 @@ pub fn get() -> &'static Config {
     CONFIG.get().expect("config not initialized")
 }
 
+pub fn get_theme() -> &'static Theme {
+    &CONFIG.get().expect("config not initialized").theme
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {

@@ -1,4 +1,5 @@
 use ratatui::style::Color;
+use ratatui::style::Style;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
@@ -36,6 +37,29 @@ pub struct Theme {
     pub user_offline: Color,
     #[serde_as(as = "DisplayFromStr")]
     pub user_online: Color,
+}
+
+impl Theme {
+    pub fn default_style(&self) -> Style {
+        Style::new().fg(self.foreground).bg(self.backround)
+    }
+    pub fn user_away_style(&self) -> Style {
+        Style::new().fg(self.user_away).bg(self.backround)
+    }
+    pub fn user_dnd_style(&self) -> Style {
+        Style::new().fg(self.user_dnd).bg(self.backround)
+    }
+    pub fn user_offline_style(&self) -> Style {
+        Style::new().fg(self.user_offline).bg(self.backround)
+    }
+    pub fn user_online_style(&self) -> Style {
+        Style::new().fg(self.user_online).bg(self.backround)
+    }
+    pub fn unread_message_style(&self) -> Style {
+        Style::new()
+            .fg(self.foreground_unread_message)
+            .bg(self.backround_unread_message)
+    }
 }
 
 impl Default for Theme {
