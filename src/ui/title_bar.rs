@@ -1,5 +1,6 @@
 use crate::backend::nc_room::NCRoomInterface;
-use crate::{backend::nc_talk::NCBackend, config, ui::app::CurrentScreen};
+use crate::config::get_theme;
+use crate::{backend::nc_talk::NCBackend, ui::app::CurrentScreen};
 
 use num_traits::AsPrimitive;
 use ratatui::{
@@ -41,7 +42,7 @@ impl<'a> TitleBar<'a> {
             Text::raw("")
         } else {
             Text::raw("UNREAD: ".to_owned() + unread_array.join(", ").as_str())
-                .set_style(Style::default().white().on_red().rapid_blink().bold())
+                .set_style(get_theme().title_important_style().rapid_blink())
         };
     }
 
@@ -55,16 +56,12 @@ impl<'a> Widget for &TitleBar<'a> {
         let (room_title, room_title_style) = if self.unread > 0 {
             (
                 format!("Current: {}: {}", self.room, self.unread),
-                Style::default()
-                    .fg(config::get().theme.foreground_unread_message)
-                    .bg(config::get().theme.backround_unread_message),
+                get_theme().title_status_style(),
             )
         } else {
             (
                 format!("Current: {}", self.room),
-                Style::default()
-                    .fg(config::get().theme.foreground_titlebar)
-                    .bg(config::get().theme.backround),
+                get_theme().title_status_style(),
             )
         };
 
@@ -79,7 +76,7 @@ impl<'a> Widget for &TitleBar<'a> {
 
         let title_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(Style::default());
+            .style(get_theme().default_style());
 
         Paragraph::new(Text::styled(room_title, room_title_style))
             .block(title_block)
@@ -87,7 +84,7 @@ impl<'a> Widget for &TitleBar<'a> {
 
         let unread_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(Style::default());
+            .style(get_theme().default_style());
 
         Paragraph::new(self.unread_rooms.clone())
             .block(unread_block)
@@ -95,11 +92,11 @@ impl<'a> Widget for &TitleBar<'a> {
 
         let mode_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(Style::default());
+            .style(get_theme().default_style());
 
         Paragraph::new(Text::styled(
             self.mode.clone(),
-            Style::default().fg(Color::Green),
+            get_theme().title_status_style(),
         ))
         .block(mode_block)
         .alignment(Alignment::Right)

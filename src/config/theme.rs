@@ -29,6 +29,12 @@ pub struct Theme {
     /// Text Colour for titlebar contents
     #[serde_as(as = "DisplayFromStr")]
     pub foreground_titlebar: Color,
+    /// Text Colour for titlebar contents
+    #[serde_as(as = "DisplayFromStr")]
+    pub backround_important_titlebar: Color,
+    /// Text Colour for titlebar contents
+    #[serde_as(as = "DisplayFromStr")]
+    pub foreground_important_titlebar: Color,
 
     #[serde_as(as = "DisplayFromStr")]
     pub user_away: Color,
@@ -65,12 +71,23 @@ impl Theme {
     pub fn table_header_style(&self) -> Style {
         Style::new().bold().fg(self.table_header).bg(self.backround)
     }
+
+    pub fn title_status_style(&self) -> Style {
+        Style::new().bg(self.backround).fg(self.foreground_titlebar)
+    }
+
+    pub fn title_important_style(&self) -> Style {
+        Style::new()
+            .bold()
+            .bg(self.backround_important_titlebar)
+            .fg(self.foreground_important_titlebar)
+    }
 }
 
 impl Default for Theme {
     fn default() -> Self {
         Self {
-            backround: Color::Black,
+            backround: Color::DarkGray,
             foreground: Color::White,
             user_away: Color::Blue,
             user_dnd: Color::Red,
@@ -80,6 +97,8 @@ impl Default for Theme {
             foreground_unread_message: Color::from_str("#e0def4").unwrap(),
             table_header: Color::from_str("#e0def4").unwrap(),
             foreground_titlebar: Color::White,
+            backround_important_titlebar: Color::Red,
+            foreground_important_titlebar: Color::White,
         }
     }
 }
