@@ -1,5 +1,6 @@
 use ratatui::style::Color;
 use ratatui::style::Style;
+use ratatui::style::Stylize;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 use std::str::FromStr;
@@ -59,6 +60,10 @@ impl Theme {
         Style::new()
             .fg(self.foreground_unread_message)
             .bg(self.backround_unread_message)
+    }
+
+    pub fn table_header_style(&self) -> Style {
+        Style::new().bold().fg(self.table_header).bg(self.backround)
     }
 }
 

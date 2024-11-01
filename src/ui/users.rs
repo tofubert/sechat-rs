@@ -51,6 +51,7 @@ impl<'a> Users<'a> {
                         })
                     } else {
                         Cell::new(user.displayName.to_string())
+                            .style(config::get_theme().default_style())
                     }
                 }])
             })
@@ -66,8 +67,8 @@ impl<'a> StatefulWidget for &Users<'a> {
         StatefulWidget::render(
             Table::new(self.user_list.clone(), [Constraint::Percentage(100)])
                 .column_spacing(1)
-                .style(Style::new().white().on_black())
-                .header(Row::new(vec!["Users"]).style(Style::new().bold().green()))
+                .style(config::get_theme().default_style())
+                .header(Row::new(vec!["Users"]).style(config::get_theme().table_header_style()))
                 .block(Block::default())
                 .highlight_style(Style::new().bold())
                 .highlight_spacing(HighlightSpacing::Never)
@@ -82,15 +83,19 @@ impl<'a> StatefulWidget for &Users<'a> {
 
 #[cfg(test)]
 mod tests {
+
     use crate::backend::{
         nc_request::NCReqDataParticipants, nc_room::MockNCRoomInterface, nc_talk::MockNCTalk,
     };
     use backend::TestBackend;
+    use config::init;
 
     use super::*;
 
     #[test]
     fn render_users() {
+        let _ = init("./test/");
+
         let mut mock_nc_backend = MockNCTalk::new();
         let backend = TestBackend::new(10, 10);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -122,13 +127,16 @@ mod tests {
             "          ",
             "          ",
         ]);
-        expected.set_style(Rect::new(0, 0, 8, 8), Style::new().white().on_black());
+        expected.set_style(Rect::new(0, 0, 8, 8), config::get_theme().default_style());
 
+        // header
         for x in 1..=7 {
-            expected[(x, 0)].set_style(Style::new().green().on_black().bold());
+            expected[(x, 0)].set_style(config::get_theme().table_header_style());
         }
+
+        // selected user
         for x in 1..=7 {
-            expected[(x, 1)].set_style(Style::new().white().on_black().bold());
+            expected[(x, 1)].set_style(config::get_theme().default_style().bold());
         }
 
         terminal.backend().assert_buffer(&expected);
