@@ -2,19 +2,19 @@ mod data;
 mod theme;
 
 use color_eyre::eyre::eyre;
-use data::Data;
+use data::ConfigOptions;
 use etcetera::{app_strategy::Xdg, choose_app_strategy, AppStrategy, AppStrategyArgs};
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
 use std::{path::Path, path::PathBuf, process::exit, sync::OnceLock};
-use theme::Theme;
+use theme::{options::ColorPalette, Theme};
 use toml_example::TomlExample;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Config {
-    pub data: Data,
+    pub data: ConfigOptions,
     pub theme: Theme,
     strategy: Xdg,
 }
@@ -83,11 +83,11 @@ pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
-    check_config_exists_else_create_new::<Data>(&config_path);
-    check_config_exists_else_create_new::<Theme>(&theme_path);
+    check_config_exists_else_create_new::<ConfigOptions>(&config_path);
+    check_config_exists_else_create_new::<ColorPalette>(&theme_path);
 
-    let data = read_config_file::<Data>(&config_path);
-    let theme_data = read_config_file::<Theme>(&theme_path);
+    let data = read_config_file::<ConfigOptions>(&config_path);
+    let theme_data = read_config_file::<ColorPalette>(&theme_path);
 
     let mut config = Config::default();
     config.set_config_data(data);
@@ -116,7 +116,7 @@ pub fn get_theme() -> &'static Theme {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            data: Data::default(),
+            data: ConfigOptions::default(),
             theme: Theme::default(),
             strategy: choose_app_strategy(AppStrategyArgs {
                 top_level_domain: "org".to_string(),
@@ -129,11 +129,11 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn set_config_data(&mut self, data: Data) {
+    pub fn set_config_data(&mut self, data: ConfigOptions) {
         self.data = data;
     }
-    pub fn set_theme(&mut self, data: Theme) {
-        self.theme = data;
+    pub fn set_theme(&mut self, data: ColorPalette) {
+        self.theme.set_theme(data);
     }
     pub fn set_strategy(&mut self, strategy: Xdg) {
         self.strategy = strategy;
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn update_data() {
         let mut conf = Config::default();
-        conf.set_config_data(Data::default());
+        conf.set_config_data(ConfigOptions::default());
         conf.set_strategy(
             choose_app_strategy(AppStrategyArgs {
                 top_level_domain: "org".to_string(),

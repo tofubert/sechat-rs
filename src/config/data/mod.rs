@@ -9,7 +9,7 @@ use toml_example::TomlExample;
 use ui::Ui;
 
 #[derive(Serialize, Deserialize, Debug, Default, TomlExample)]
-pub struct Data {
+pub struct ConfigOptions {
     #[toml_example(nesting)]
     pub general: General,
     #[toml_example(nesting)]

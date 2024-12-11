@@ -1,6 +1,4 @@
 use ratatui::style::Color;
-use ratatui::style::Style;
-use ratatui::style::Stylize;
 use serde::{Deserialize, Serialize};
 use toml_example::TomlExample;
 
@@ -10,7 +8,7 @@ use toml_example::TomlExample;
 /// hex, e.g. "#a03f49", see <https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html#method.deserialize>
 /// `toml_example` seems to not handle index and hex well, so the default is pure strings
 #[derive(Serialize, Deserialize, Debug, Default, TomlExample)]
-pub struct Theme {
+pub struct ColorPalette {
     /// Default Background
     #[toml_example(default = "black")]
     pub background: Color,
@@ -66,52 +64,4 @@ pub struct Theme {
     /// Foreground for Online Users
     #[toml_example(default = "green")]
     pub user_online: Color,
-}
-
-impl Theme {
-    pub fn default_style(&self) -> Style {
-        Style::new().fg(self.foreground).bg(self.background)
-    }
-    pub fn default_highlight_style(&self) -> Style {
-        Style::new()
-            .fg(self.foreground_highlight)
-            .bg(self.background_highlight)
-    }
-    pub fn user_away_style(&self) -> Style {
-        Style::new().fg(self.user_away).bg(self.background)
-    }
-    pub fn user_dnd_style(&self) -> Style {
-        Style::new().fg(self.user_dnd).bg(self.background)
-    }
-    pub fn user_offline_style(&self) -> Style {
-        Style::new().fg(self.user_offline).bg(self.background)
-    }
-    pub fn user_online_style(&self) -> Style {
-        Style::new().fg(self.user_online).bg(self.background)
-    }
-    pub fn unread_message_style(&self) -> Style {
-        Style::new()
-            .fg(self.foreground_unread_message)
-            .bg(self.background_unread_message)
-    }
-
-    pub fn table_header_style(&self) -> Style {
-        Style::new()
-            .bold()
-            .fg(self.table_header)
-            .bg(self.background)
-    }
-
-    pub fn title_status_style(&self) -> Style {
-        Style::new()
-            .bg(self.background)
-            .fg(self.foreground_titlebar)
-    }
-
-    pub fn title_important_style(&self) -> Style {
-        Style::new()
-            .bold()
-            .bg(self.background_important_titlebar)
-            .fg(self.foreground_important_titlebar)
-    }
 }
