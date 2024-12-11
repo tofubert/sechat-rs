@@ -18,8 +18,8 @@ pub struct ChatBox<'a> {
     state: TableState,
 }
 
-impl<'a> ChatBox<'a> {
-    pub fn new() -> ChatBox<'a> {
+impl ChatBox<'_> {
+    pub fn new() -> Self {
         ChatBox {
             messages: Vec::new(),
             current_index: 0,

@@ -10,8 +10,8 @@ pub struct InputBox<'a> {
     textarea: TextArea<'a>,
 }
 
-impl<'a> InputBox<'a> {
-    pub fn new(initial_message: &str) -> InputBox<'a> {
+impl InputBox<'_> {
+    pub fn new(initial_message: &str) -> Self {
         let mut textarea = TextArea::new(vec![initial_message.into()]);
         textarea.set_block(
             Block::default()

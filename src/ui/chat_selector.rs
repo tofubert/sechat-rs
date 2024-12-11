@@ -18,7 +18,7 @@ pub struct ChatSelector<'a> {
     items: Vec<TreeItem<'a, String>>,
 }
 
-impl<'a> ChatSelector<'a> {
+impl ChatSelector<'_> {
     pub fn new(backend: &impl NCBackend) -> Self {
         Self {
             state: TreeState::default(),

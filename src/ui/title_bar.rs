@@ -16,8 +16,8 @@ pub struct TitleBar<'a> {
     unread_rooms: Text<'a>,
 }
 
-impl<'a> TitleBar<'a> {
-    pub fn new(initial_state: CurrentScreen, room: String) -> TitleBar<'a> {
+impl TitleBar<'_> {
+    pub fn new(initial_state: CurrentScreen, room: String) -> Self {
         TitleBar {
             room,
             mode: initial_state.to_string(),

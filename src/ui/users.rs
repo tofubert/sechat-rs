@@ -14,7 +14,7 @@ pub struct Users<'a> {
     state: TableState,
 }
 
-impl<'a> Default for Users<'a> {
+impl Default for Users<'_> {
     fn default() -> Self {
         Self::new()
     }
