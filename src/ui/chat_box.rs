@@ -149,7 +149,7 @@ impl ChatBox<'_> {
     }
 }
 
-impl<'a> StatefulWidget for &ChatBox<'a> {
+impl StatefulWidget for &ChatBox<'_> {
     type State = TableState;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         // Columns widths are constrained in the same way as Layout...

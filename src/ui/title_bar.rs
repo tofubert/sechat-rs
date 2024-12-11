@@ -51,7 +51,7 @@ impl TitleBar<'_> {
     }
 }
 
-impl<'a> Widget for &TitleBar<'a> {
+impl Widget for &TitleBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let (room_title, room_title_style) = if self.unread > 0 {
             (

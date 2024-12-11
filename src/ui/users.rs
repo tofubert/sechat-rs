@@ -20,8 +20,8 @@ impl Default for Users<'_> {
     }
 }
 
-impl<'a> Users<'a> {
-    pub fn new() -> Users<'a> {
+impl Users<'_> {
+    pub fn new() -> Self {
         Users {
             user_list: vec![],
             state: TableState::default().with_offset(0).with_selected(0),
@@ -61,7 +61,7 @@ impl<'a> Users<'a> {
     }
 }
 
-impl<'a> StatefulWidget for &Users<'a> {
+impl StatefulWidget for &Users<'_> {
     type State = TableState;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         StatefulWidget::render(

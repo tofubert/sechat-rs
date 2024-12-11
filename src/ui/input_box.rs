@@ -34,7 +34,7 @@ impl<'a> std::ops::Deref for InputBox<'a> {
     }
 }
 
-impl<'a> std::ops::DerefMut for InputBox<'a> {
+impl std::ops::DerefMut for InputBox<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.textarea
     }
