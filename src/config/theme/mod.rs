@@ -66,3 +66,68 @@ impl Theme {
             .fg(self.data.foreground_important_titlebar)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ratatui::style::Color;
+    use ratatui::style::Style;
+
+    use super::*;
+
+    #[test]
+    fn default_values() {
+        let theme = Theme::default();
+        assert_eq!(
+            theme.default_highlight_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.user_away_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.user_dnd_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.user_offline_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.user_online_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.unread_message_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.table_header_style(),
+            Style::new()
+                .fg(Color::default())
+                .bg(Color::default())
+                .bold()
+        );
+        assert_eq!(
+            theme.title_status_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+        assert_eq!(
+            theme.title_important_style(),
+            Style::new()
+                .fg(Color::default())
+                .bg(Color::default())
+                .bold()
+        );
+    }
+
+    #[test]
+    fn set_data() {
+        let mut theme = Theme::default();
+        theme.set_theme(options::ColorPalette::default());
+        assert_eq!(
+            theme.unread_message_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
+        );
+    }
+}

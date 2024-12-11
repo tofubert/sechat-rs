@@ -222,6 +222,9 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::style::Color;
+    use ratatui::style::Style;
+
     use super::*;
 
     #[test]
@@ -252,6 +255,17 @@ mod tests {
         assert!(get().get_enable_mouse());
         assert!(get().get_enable_paste());
     }
+
+    #[test]
+    fn default_theme() {
+        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let _ = init("./test/");
+        assert_eq!(
+            get_theme().default_style(),
+            Style::new().fg(Color::White).bg(Color::Black)
+        );
+    }
+
     #[test]
     fn init_logging() {
         let conf = Config::default();
