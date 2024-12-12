@@ -83,7 +83,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn render_users() {
+    fn render() {
         let dir = tempfile::tempdir().unwrap();
 
         std::env::set_var("HOME", dir.path().as_os_str());
