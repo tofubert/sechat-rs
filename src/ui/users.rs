@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn render_users() {
-        let config = init("./test/");
+        let config = init("./test/").unwrap();
 
         let mut mock_nc_backend = MockNCTalk::new();
         let backend = TestBackend::new(10, 10);

@@ -23,6 +23,8 @@ exclude = [
 [dev-dependencies]
 mockall = { version = "0.13.1" }
 mockall_derive = { version = "0.13.1"}
+tempfile = "3.14.0"
+
 
 [dependencies]
 reqwest = { version = "0.12", features = ["json"] }

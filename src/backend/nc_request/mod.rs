@@ -440,7 +440,7 @@ mod tests {
 
     #[tokio::test]
     async fn new_requester() {
-        let config = init("./test/");
+        let config = init("./test/").unwrap();
         let result = NCRequest::new(&config);
         assert!(result.is_ok());
         let requester = result.unwrap();

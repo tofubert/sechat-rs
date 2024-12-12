@@ -14,10 +14,10 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
     let args = Args::parse();
 
-    let config = config::init(&args.config_path);
+    let config = config::init(&args.config_path)?;
     config.config_logging();
 
     // check if crate has alpha suffix in version
@@ -34,4 +34,5 @@ async fn main() {
             log::error!("Failed to create backend because: {why}");
         }
     };
+    Ok(())
 }

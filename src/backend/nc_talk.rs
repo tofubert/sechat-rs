@@ -447,7 +447,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_backend() {
-        let config = init("./test/");
+        let config = init("./test/").unwrap();
 
         let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
         let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
