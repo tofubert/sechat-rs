@@ -61,11 +61,11 @@ impl ChatBox<'_> {
         for message_data in backend
             .get_room(current_room)
             .get_messages()
-            .iter()
+            .values()
             .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
         {
             let name = textwrap::wrap(
-                message_data.get_name(),
+                message_data.get_name().to_string().as_str(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
             )
             .into_iter()
@@ -187,6 +187,8 @@ impl StatefulWidget for &ChatBox<'_> {
 #[cfg(test)]
 mod tests {
 
+    use std::collections::BTreeMap;
+
     use crate::backend::nc_message::NCMessage;
     use crate::backend::nc_request::{NCReqDataMessage, NCReqDataParticipants};
     use crate::backend::nc_room::MockNCRoomInterface;
@@ -224,6 +226,8 @@ mod tests {
             timestamp: timestamp_2.timestamp(),
             ..Default::default()
         });
+        let message_tree = BTreeMap::from([(1, mock_message_1), (2, mock_message_2)]);
+
         let backend = TestBackend::new(40, 10);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut chat_box = ChatBox::new(&config);
@@ -233,7 +237,7 @@ mod tests {
         mock_room
             .expect_get_messages()
             .once()
-            .return_const(vec![mock_message_1, mock_message_2]);
+            .return_const(message_tree);
         mock_room.expect_has_unread().times(2).return_const(false);
         mock_nc_backend
             .expect_get_room()

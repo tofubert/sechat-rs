@@ -6,9 +6,11 @@ use super::{
     },
 };
 use async_trait::async_trait;
+use itertools::Itertools;
 use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -50,7 +52,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     /// Check if this Room is a Group Chat.
     fn is_group(&self) -> bool;
     /// Get a Vector of all the messages in the room.
-    fn get_messages(&self) -> &Vec<NCMessage>;
+    fn get_messages(&self) -> &BTreeMap<i32, NCMessage>;
     /// Get how many messages are unread.
     fn get_unread(&self) -> usize;
     /// Get the human readable display name of the room.
@@ -102,8 +104,8 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
 /// Holds its Messages, Participants, Raw Data and Path to write its log to.
 #[derive(Debug, Default)]
 pub struct NCRoom {
-    /// Vector of all its messages.
-    pub messages: Vec<NCMessage>,
+    /// ``BTreeMap`` of all its messages.
+    pub messages: BTreeMap<i32, NCMessage>,
     /// Raw Data of this Room.
     room_data: NCReqDataRoom,
     /// Path to write json output to.
@@ -127,13 +129,15 @@ impl NCRoom {
         tmp_path_buf.push(room_data.token.as_str());
         let path = tmp_path_buf.as_path();
 
-        let mut messages = Vec::<NCMessage>::new();
+        let mut messages = BTreeMap::<i32, NCMessage>::new();
 
         if path.exists() && path.is_file() {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
                 std::fs::read_to_string(path).unwrap().as_str(),
             ) {
-                messages.extend(data.into_iter().map(Into::into));
+                for message in data {
+                    messages.insert(message.id, message.into());
+                }
             } else {
                 log::debug!(
                     "Failed to parse json for {}, falling back to fetching",
@@ -165,7 +169,7 @@ impl NCRoom {
     async fn fetch_messages<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         requester: Arc<Mutex<Requester>>,
         token: &Token,
-        messages: &mut Vec<NCMessage>,
+        messages: &mut BTreeMap<i32, NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let response_onceshot = {
             requester
@@ -180,7 +184,7 @@ impl NCRoom {
             .expect("Failed for fetch chat update")
             .expect("Failed request");
         for message in response {
-            messages.push(message.into());
+            messages.insert(message.id, message.into());
         }
         Ok(())
     }
@@ -191,7 +195,7 @@ impl NCRoomInterface for NCRoom {
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
-            .iter()
+            .values()
             .filter(|&message| !message.is_reaction() && !message.is_edit_note())
             .collect::<Vec<&NCMessage>>()
             .last()
@@ -223,7 +227,7 @@ impl NCRoomInterface for NCRoom {
         &self.room_type
     }
 
-    fn get_messages(&self) -> &Vec<NCMessage> {
+    fn get_messages(&self) -> &BTreeMap<i32, NCMessage> {
         &self.messages
     }
 
@@ -253,7 +257,7 @@ impl NCRoomInterface for NCRoom {
     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
-        let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
+        let data: Vec<_> = self.messages.values().map(NCMessage::data).collect();
         let path = self.path_to_log.as_path();
         // Open a file in write-only mode, returns `io::Result<File>`
         let mut file = match std::fs::File::create(path) {
@@ -327,7 +331,16 @@ impl NCRoomInterface for NCRoom {
                 .request_chat_update(
                     &self.room_data.token,
                     200,
-                    self.messages.last().unwrap().get_id(),
+                    self.messages
+                        .get(
+                            self.messages
+                                .keys()
+                                .sorted()
+                                .last()
+                                .expect("Failed to sort messages by its keys."),
+                        )
+                        .ok_or("No last message")?
+                        .get_id(),
                 )
                 .await
                 .unwrap()
@@ -348,7 +361,7 @@ impl NCRoomInterface for NCRoom {
             );
         }
         for message in response {
-            self.messages.push(message.into());
+            self.messages.insert(message.id, message.into());
         }
         let response_onceshot = {
             requester
@@ -380,7 +393,16 @@ impl NCRoomInterface for NCRoom {
                     .await
                     .request_mark_chat_read(
                         &self.room_data.token,
-                        self.messages.last().ok_or("No last message")?.get_id(),
+                        self.messages
+                            .get(
+                                self.messages
+                                    .keys()
+                                    .sorted()
+                                    .last()
+                                    .expect("Failed to sort messages by its keys."),
+                            )
+                            .ok_or("No last message")?
+                            .get_id(),
                     )
                     .await
                     .unwrap()
