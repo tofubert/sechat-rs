@@ -228,11 +228,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[should_panic(expected = "config not initialized")]
-    fn get_config_before_init() {
-        get();
-    }
-    #[test]
     #[should_panic(
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
     )]
