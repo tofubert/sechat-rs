@@ -4,10 +4,14 @@ use super::{
     nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequestInterface},
 };
 use async_trait::async_trait;
+use itertools::Itertools;
 use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
-use std::fmt::{Debug, Display};
+use std::{
+    collections::BTreeMap,
+    fmt::{Debug, Display},
+};
 
 #[derive(Debug, FromPrimitive, PartialEq, Default)]
 pub enum NCRoomTypes {
@@ -31,7 +35,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     #[allow(dead_code)]
     fn is_dm(&self) -> bool;
     fn is_group(&self) -> bool;
-    fn get_messages(&self) -> &Vec<NCMessage>;
+    fn get_messages(&self) -> &BTreeMap<i32, NCMessage>;
     fn get_unread(&self) -> usize;
     fn get_display_name(&self) -> &str;
     fn get_last_read(&self) -> i32;
@@ -60,7 +64,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
 pub struct NCRoom<Requester: NCRequestInterface + 'static + std::marker::Sync> {
     requester: Requester,
     notifier: NCNotify,
-    pub messages: Vec<NCMessage>,
+    pub messages: BTreeMap<i32, NCMessage>,
     room_data: NCReqDataRoom,
     path_to_log: std::path::PathBuf,
     pub room_type: NCRoomTypes,
@@ -78,13 +82,15 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
         tmp_path_buf.push(room_data.token.as_str());
         let path = tmp_path_buf.as_path();
 
-        let mut messages = Vec::<NCMessage>::new();
+        let mut messages = BTreeMap::<i32, NCMessage>::new();
 
         if path.exists() && path.is_file() {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
                 std::fs::read_to_string(path).unwrap().as_str(),
             ) {
-                messages.extend(data.into_iter().map(Into::into));
+                for message in data {
+                    messages.insert(message.id, message.into());
+                }
             } else {
                 log::debug!(
                     "Failed to parse json for {}, falling back to fetching",
@@ -118,11 +124,11 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
     async fn fetch_messages(
         requester: &Requester,
         token: &str,
-        messages: &mut Vec<NCMessage>,
+        messages: &mut BTreeMap<i32, NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let response = requester.fetch_chat_initial(token, 200).await?;
         for message in response {
-            messages.push(message.into());
+            messages.insert(message.id, message.into());
         }
         Ok(())
     }
@@ -135,7 +141,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
-            .iter()
+            .values()
             .filter(|&message| !message.is_reaction() && !message.is_edit_note())
             .collect::<Vec<&NCMessage>>()
             .last()
@@ -167,7 +173,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
         &self.room_type
     }
 
-    fn get_messages(&self) -> &Vec<NCMessage> {
+    fn get_messages(&self) -> &BTreeMap<i32, NCMessage> {
         &self.messages
     }
 
@@ -197,7 +203,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
-        let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
+        let data: Vec<_> = self.messages.values().map(NCMessage::data).collect();
         let path = self.path_to_log.as_path();
         // Open a file in write-only mode, returns `io::Result<File>`
         let mut file = match std::fs::File::create(path) {
@@ -257,7 +263,16 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
             .fetch_chat_update(
                 self.room_data.token.as_str(),
                 200,
-                self.messages.last().unwrap().get_id(),
+                self.messages
+                    .get(
+                        self.messages
+                            .keys()
+                            .sorted()
+                            .last()
+                            .expect("Failed to sort messages by its keys."),
+                    )
+                    .unwrap()
+                    .get_id(),
             )
             .await
             .unwrap();
@@ -273,7 +288,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
             );
         }
         for message in response {
-            self.messages.push(message.into());
+            self.messages.insert(message.id, message.into());
         }
         self.participants = self
             .requester
@@ -288,7 +303,16 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
             self.requester
                 .mark_chat_read(
                     &self.room_data.token,
-                    self.messages.last().ok_or("No last message")?.get_id(),
+                    self.messages
+                        .get(
+                            self.messages
+                                .keys()
+                                .sorted()
+                                .last()
+                                .expect("Failed to sort messages by its keys."),
+                        )
+                        .ok_or("No last message")?
+                        .get_id(),
                 )
                 .await?;
         }
