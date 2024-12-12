@@ -58,6 +58,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
         data_option: Option<NCReqDataRoom>,
     ) -> Result<(), Box<dyn std::error::Error>>;
     async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn fill_history(&mut self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Debug, Default)]
@@ -303,16 +304,11 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
             self.requester
                 .mark_chat_read(
                     &self.room_data.token,
-                    self.messages
-                        .get(
-                            self.messages
-                                .keys()
-                                .sorted()
-                                .last()
-                                .expect("Failed to sort messages by its keys."),
-                        )
-                        .ok_or("No last message")?
-                        .get_id(),
+                    *(self
+                        .messages
+                        .keys()
+                        .last()
+                        .expect("Failed to sort messages by its keys.")),
                 )
                 .await?;
         }
@@ -346,6 +342,38 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
                 }
                 Ordering::Equal => (),
             }
+        }
+        Ok(())
+    }
+
+    async fn fill_history(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let response = self
+            .requester
+            .fetch_chat_update(
+                self.room_data.token.as_str(),
+                200,
+                *(self
+                    .messages
+                    .first_key_value()
+                    .expect("Failed to sort messages by its keys.")
+                    .0)
+                    - 200,
+            )
+            .await
+            .unwrap();
+        if self.has_unread() && !response.is_empty() {
+            self.notifier
+                .unread_message(&self.room_data.displayName, response.len())?;
+        }
+        if !response.is_empty() {
+            log::debug!(
+                "Updating {} adding {} new Messages",
+                self.to_string(),
+                response.len().to_string()
+            );
+        }
+        for message in response {
+            self.messages.insert(message.id, message.into());
         }
         Ok(())
     }
