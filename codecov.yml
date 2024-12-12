@@ -1,7 +1,7 @@
 coverage: # https://docs.codecov.com/docs/codecovyml-reference#coverage
   precision: 1 # e.g. 89.1%
   round: down
-  range: 85..100 # https://docs.codecov.com/docs/coverage-configuration#section-range
+  range: 50..70 # https://docs.codecov.com/docs/coverage-configuration#section-range
   status: # https://docs.codecov.com/docs/commit-status
     project:
       default:
