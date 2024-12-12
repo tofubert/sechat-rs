@@ -177,3 +177,127 @@ impl StatefulWidget for &ChatBox<'_> {
         );
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::backend::nc_message::NCMessage;
+    use crate::backend::nc_request::{NCReqDataMessage, NCReqDataParticipants};
+    use crate::backend::nc_room::MockNCRoomInterface;
+    use crate::backend::nc_talk::MockNCTalk;
+    use crate::config::init;
+    use backend::TestBackend;
+    use chrono::{DateTime, Local, Utc};
+
+    use super::*;
+
+    #[test]
+    fn render() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+
+        let mut mock_nc_backend = MockNCTalk::new();
+        let mut mock_room = MockNCRoomInterface::new();
+        let timestamp_1 = DateTime::<Utc>::from_timestamp(2000, 0).unwrap();
+        let mock_message_1 = NCMessage::from(NCReqDataMessage {
+            id: 0,
+            message: "Butz".to_string(),
+            messageType: "comment".to_string(),
+            actorDisplayName: "Hundi".to_string(),
+            timestamp: timestamp_1.timestamp(),
+            ..Default::default()
+        });
+        let timestamp_2 = DateTime::<Utc>::from_timestamp(200_000, 0).unwrap();
+        let mock_message_2 = NCMessage::from(NCReqDataMessage {
+            id: 1,
+            message: "Bert".to_string(),
+            messageType: "comment".to_string(),
+            actorDisplayName: "Stinko".to_string(),
+            timestamp: timestamp_2.timestamp(),
+            ..Default::default()
+        });
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut chat_box = ChatBox::new(&config);
+
+        let mut dummy_user = NCReqDataParticipants::default();
+        dummy_user.displayName = "Butz".to_string();
+        mock_room
+            .expect_get_messages()
+            .once()
+            .return_const(vec![mock_message_1, mock_message_2]);
+        mock_room.expect_has_unread().times(2).return_const(false);
+        mock_nc_backend
+            .expect_get_current_room()
+            .times(3)
+            .return_const(mock_room);
+
+        terminal
+            .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "Time  Name                 Message      ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+        ]);
+        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+
+        expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
+
+        terminal.backend().assert_buffer(&expected);
+
+        chat_box.update_messages(&mock_nc_backend);
+
+        terminal
+            .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "Time  Name                 Message      ",
+            "01:33 Hundi                Butz         ",
+            "04:46 Stinko               Bert         ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+        ]);
+        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+
+        expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
+        expected.set_style(
+            Rect::new(0, 1, 40, 1),
+            config.theme.default_highlight_style(),
+        );
+        expected.set_string(
+            0,
+            1,
+            DateTime::<Local>::from(timestamp_1)
+                .format("%H:%M")
+                .to_string(),
+            config.theme.default_highlight_style(),
+        );
+        expected.set_string(
+            0,
+            2,
+            DateTime::<Local>::from(timestamp_2)
+                .format("%H:%M")
+                .to_string(),
+            config.theme.default_style(),
+        );
+
+        terminal.backend().assert_buffer(&expected);
+    }
+}
