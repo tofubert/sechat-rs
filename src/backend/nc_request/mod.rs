@@ -440,6 +440,9 @@ mod tests {
 
     #[tokio::test]
     async fn new_requester() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
         let result = NCRequest::new(&config);
         assert!(result.is_ok());

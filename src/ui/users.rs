@@ -99,6 +99,9 @@ mod tests {
 
     #[test]
     fn render_users() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
 
         let mut mock_nc_backend = MockNCTalk::new();

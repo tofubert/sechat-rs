@@ -227,12 +227,11 @@ mod tests {
 
     #[test]
     fn init_empty_path() {
-        let config = init("").unwrap();
-        assert!(config.get_data_dir().ends_with(".local/share/sechat-rs"));
-        assert!(config
-            .get_http_dump_dir()
-            .expect("Not Https Dump Dir found")
-            .ends_with(".local/share/sechat-rs"));
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let res = init("");
+        assert_eq!(res.err(), Some("Config File not Present yet!".to_owned()));
     }
 
     #[test]
@@ -244,7 +243,9 @@ mod tests {
 
     #[test]
     fn default_values() {
-        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
         assert!(config.get_data_dir().ends_with(".local/share/sechat-rs"));
         assert!(config
@@ -260,7 +261,9 @@ mod tests {
 
     #[test]
     fn default_theme() {
-        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
         assert_eq!(
             config.theme.default_style(),

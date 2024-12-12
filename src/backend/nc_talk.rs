@@ -447,8 +447,10 @@ mod tests {
 
     #[tokio::test]
     async fn create_backend() {
-        let config = init("./test/").unwrap();
+        let dir = tempfile::tempdir().unwrap();
 
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
         let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
         let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
         let mut mock_requester_fetch = crate::backend::nc_request::MockNCRequest::new();
