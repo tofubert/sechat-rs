@@ -12,7 +12,7 @@ pub use nc_req_data_room::*;
 pub use nc_req_data_user::*;
 pub use nc_request_ocs_wrapper::*;
 
-use crate::config;
+use crate::config::Config;
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
@@ -78,10 +78,9 @@ pub struct NCReqDataMessageParameter {
 }
 
 impl NCRequest {
-    pub fn new() -> Result<NCRequest, Box<dyn Error>> {
+    pub fn new(config: &Config) -> Result<NCRequest, Box<dyn Error>> {
         use std::io::Write;
 
-        let config = &config::get();
         let general = &config.data.general;
 
         let username = general.user.clone();
@@ -435,12 +434,14 @@ mock! {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::init;
+
     use super::*;
 
     #[tokio::test]
     async fn new_requester() {
-        let _ = config::init("./test/");
-        let result = NCRequest::new();
+        let config = init("./test/");
+        let result = NCRequest::new(&config);
         assert!(result.is_ok());
         let requester = result.unwrap();
     }

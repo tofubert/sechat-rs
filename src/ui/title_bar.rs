@@ -1,8 +1,8 @@
 use crate::backend::nc_room::NCRoomInterface;
-use crate::config::get_theme;
+use crate::config::Config;
 use crate::{backend::nc_talk::NCBackend, ui::app::CurrentScreen};
 
-use num_traits::AsPrimitive;
+use num_traits::AsPrimitive as _;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
@@ -14,15 +14,21 @@ pub struct TitleBar<'a> {
     mode: String,
     unread: usize,
     unread_rooms: Text<'a>,
+    title_important_style: Style,
+    title_style: Style,
+    default_style: Style,
 }
 
 impl TitleBar<'_> {
-    pub fn new(initial_state: CurrentScreen, room: String) -> Self {
+    pub fn new(initial_state: CurrentScreen, room: String, config: &Config) -> Self {
         TitleBar {
             room,
             mode: initial_state.to_string(),
             unread: 0,
             unread_rooms: Text::raw(""),
+            title_important_style: config.theme.title_important_style().rapid_blink(),
+            title_style: config.theme.title_status_style(),
+            default_style: config.theme.default_style(),
         }
     }
 
@@ -42,7 +48,7 @@ impl TitleBar<'_> {
             Text::raw("")
         } else {
             Text::raw("UNREAD: ".to_owned() + unread_array.join(", ").as_str())
-                .set_style(get_theme().title_important_style().rapid_blink())
+                .set_style(self.title_important_style)
         };
     }
 
@@ -56,13 +62,10 @@ impl Widget for &TitleBar<'_> {
         let (room_title, room_title_style) = if self.unread > 0 {
             (
                 format!("Current: {}: {}", self.room, self.unread),
-                get_theme().title_status_style(),
+                self.title_style,
             )
         } else {
-            (
-                format!("Current: {}", self.room),
-                get_theme().title_status_style(),
-            )
+            (format!("Current: {}", self.room), self.title_style)
         };
 
         let title_layout = Layout::default()
@@ -76,7 +79,7 @@ impl Widget for &TitleBar<'_> {
 
         let title_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(get_theme().default_style());
+            .style(self.default_style);
 
         Paragraph::new(Text::styled(room_title, room_title_style))
             .block(title_block)
@@ -84,7 +87,7 @@ impl Widget for &TitleBar<'_> {
 
         let unread_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(get_theme().default_style());
+            .style(self.default_style);
 
         Paragraph::new(self.unread_rooms.clone())
             .block(unread_block)
@@ -92,14 +95,11 @@ impl Widget for &TitleBar<'_> {
 
         let mode_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(get_theme().default_style());
+            .style(self.default_style);
 
-        Paragraph::new(Text::styled(
-            self.mode.clone(),
-            get_theme().title_status_style(),
-        ))
-        .block(mode_block)
-        .alignment(Alignment::Right)
-        .render(title_layout[2], buf);
+        Paragraph::new(Text::styled(self.mode.clone(), self.title_style))
+            .block(mode_block)
+            .alignment(Alignment::Right)
+            .render(title_layout[2], buf);
     }
 }

@@ -1,16 +1,13 @@
 mod data;
 mod theme;
 
-use color_eyre::eyre::eyre;
 use data::ConfigOptions;
 use etcetera::{app_strategy::Xdg, choose_app_strategy, AppStrategy, AppStrategyArgs};
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
-use std::{path::Path, path::PathBuf, process::exit, sync::OnceLock};
+use std::{path::Path, path::PathBuf, process::exit};
 use theme::{options::ColorPalette, Theme};
 use toml_example::TomlExample;
-
-static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Config {
@@ -62,7 +59,7 @@ pub fn read_config_file<T: TomlExample + DeserializeOwned>(config_path: &PathBuf
     data
 }
 
-pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
+pub fn init(path_arg: &str) -> Config {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "org".to_string(),
         author: "emlix".to_string(),
@@ -93,24 +90,7 @@ pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
     config.set_config_data(data);
     config.set_theme(theme_data);
     config.set_strategy(strategy);
-    CONFIG
-        .set(config)
-        .map_err(|config| eyre!("Failed to set config {config:?}"))
-}
-
-/// Get the application configuration.
-///
-/// This function should only be called after [`init()`] has been called.
-///
-/// # Panics
-///
-/// This function will panic if [`init()`] has not been called.
-pub fn get() -> &'static Config {
-    CONFIG.get().expect("config not initialized")
-}
-
-pub fn get_theme() -> &'static Theme {
-    &CONFIG.get().expect("config not initialized").theme
+    config
 }
 
 impl Default for Config {
@@ -232,31 +212,31 @@ mod tests {
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
     )]
     fn init_with_faulty_path() {
-        assert!(init("/bogus_test/path").is_err());
+        let _ = init("/bogus_test/path");
     }
 
     #[test]
     fn default_values() {
         // since we cant control the order of the tests we cannot be sure that this returns suchess.
-        let _ = init("./test/");
-        assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
-        assert!(get()
+        let config = init("./test/");
+        assert!(config.get_data_dir().ends_with(".local/share/sechat-rs"));
+        assert!(config
             .get_server_data_dir()
             .ends_with(".local/share/sechat-rs/MyNCInstance"));
-        assert!(get()
+        assert!(config
             .get_http_dump_dir()
             .expect("Not Https Dump Dir found")
             .ends_with(".local/share/sechat-rs"));
-        assert!(get().get_enable_mouse());
-        assert!(get().get_enable_paste());
+        assert!(config.get_enable_mouse());
+        assert!(config.get_enable_paste());
     }
 
     #[test]
     fn default_theme() {
         // since we cant control the order of the tests we cannot be sure that this returns suchess.
-        let _ = init("./test/");
+        let config = init("./test/");
         assert_eq!(
-            get_theme().default_style(),
+            config.theme.default_style(),
             Style::new().fg(Color::White).bg(Color::Black)
         );
     }

@@ -6,12 +6,12 @@ pub mod input_box;
 pub mod title_bar;
 pub mod users;
 
-use crate::backend::{nc_request::NCRequest, nc_talk::NCTalk};
-
-use super::{
-    config,
-    ui::app::{App, CurrentScreen},
+use crate::{
+    backend::{nc_request::NCRequest, nc_talk::NCTalk},
+    config::Config,
 };
+
+use super::ui::app::{App, CurrentScreen};
 use cfg_if::cfg_if;
 use color_eyre::{
     config::{EyreHook, HookBuilder, PanicHook},
@@ -31,7 +31,7 @@ use ratatui::prelude::*;
 use tracing::error;
 use tui_textarea::{Input, Key};
 
-pub fn install_hooks() -> eyre::Result<()> {
+pub fn install_hooks(config: &Config) -> eyre::Result<()> {
     let (panic_hook, eyre_hook) = HookBuilder::default()
         .panic_section(format!(
             "This is a bug. Consider reporting it at {}",
@@ -49,8 +49,8 @@ pub fn install_hooks() -> eyre::Result<()> {
             human_panic::setup_panic!();
         }
     }
-    install_color_eyre_panic_hook(panic_hook);
-    install_eyre_hook(eyre_hook)?;
+    install_color_eyre_panic_hook(panic_hook, config);
+    install_eyre_hook(eyre_hook, config)?;
 
     Ok(())
 }
@@ -63,12 +63,14 @@ fn install_better_panic() {
         .install();
 }
 
-fn install_color_eyre_panic_hook(panic_hook: PanicHook) {
+fn install_color_eyre_panic_hook(panic_hook: PanicHook, config: &Config) {
     // convert from a `color_eyre::config::PanicHook`` to a `Box<dyn
     // Fn(&PanicInfo<'_>`
     let panic_hook = panic_hook.into_panic_hook();
+    let get_enable_mouse = config.get_enable_mouse();
+    let get_enable_paste = config.get_enable_paste();
     std::panic::set_hook(Box::new(move |panic_info| {
-        if let Err(err) = restore() {
+        if let Err(err) = restore(get_enable_mouse, get_enable_paste) {
             error!("Unable to restore terminal: {err:?}");
         }
 
@@ -79,10 +81,12 @@ fn install_color_eyre_panic_hook(panic_hook: PanicHook) {
     }));
 }
 
-fn install_eyre_hook(eyre_hook: EyreHook) -> color_eyre::Result<()> {
+fn install_eyre_hook(eyre_hook: EyreHook, config: &Config) -> color_eyre::Result<()> {
     let eyre_hook = eyre_hook.into_eyre_hook();
+    let get_enable_mouse = config.get_enable_mouse();
+    let get_enable_paste = config.get_enable_paste();
     eyre::set_hook(Box::new(move |error| {
-        restore().unwrap();
+        restore(get_enable_mouse, get_enable_paste).unwrap();
         eyre_hook(error)
     }))?;
     Ok(())
@@ -90,7 +94,7 @@ fn install_eyre_hook(eyre_hook: EyreHook) -> color_eyre::Result<()> {
 
 pub type Tui = Terminal<CrosstermBackend<std::io::Stdout>>;
 
-pub fn init() -> eyre::Result<Tui> {
+pub fn init(get_enable_mouse: bool, get_enable_paste: bool) -> eyre::Result<Tui> {
     use std::io::stdout;
 
     enable_raw_mode()?;
@@ -103,10 +107,10 @@ pub fn init() -> eyre::Result<Tui> {
     {
         log::warn!("Consider using a Terminal that supports KeyboardEnhancementFlags.");
     }
-    if config::get().get_enable_mouse() {
+    if get_enable_mouse {
         execute!(stdout(), EnableMouseCapture)?;
     }
-    if config::get().get_enable_paste() {
+    if get_enable_paste {
         execute!(stdout(), EnableBracketedPaste)?;
     }
     let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
@@ -115,13 +119,13 @@ pub fn init() -> eyre::Result<Tui> {
     Ok(terminal)
 }
 
-pub fn restore() -> eyre::Result<()> {
+pub fn restore(get_enable_mouse: bool, get_enable_paste: bool) -> eyre::Result<()> {
     use std::io::stdout;
 
-    if config::get().get_enable_paste() {
+    if get_enable_paste {
         execute!(stdout(), DisableBracketedPaste)?;
     }
-    if config::get().get_enable_mouse() {
+    if get_enable_mouse {
         execute!(stdout(), DisableMouseCapture)?;
     }
 
@@ -138,17 +142,21 @@ enum ProcessEventResult {
     Exit,
 }
 
-pub async fn run(nc_backend: NCTalk<NCRequest>) -> Result<(), Box<dyn std::error::Error>> {
-    install_hooks()?;
+pub async fn run(
+    nc_backend: NCTalk<NCRequest>,
+    config: &Config,
+) -> Result<(), Box<dyn std::error::Error>> {
+    install_hooks(config)?;
 
     // create app and run it
     run_app(
-        init().expect("Failed to init Terminal UI."),
-        app::App::new(nc_backend),
+        init(config.get_enable_mouse(), config.get_enable_paste())
+            .expect("Failed to init Terminal UI."),
+        app::App::new(nc_backend, config),
     )
     .await?;
 
-    restore()?;
+    restore(config.get_enable_mouse(), config.get_enable_paste())?;
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-use crate::config::{self};
+use crate::config::Config;
 use notify_rust::{Hint, Notification, Timeout};
 
 #[derive(Debug, Clone, Default)]
@@ -9,16 +9,15 @@ pub struct NCNotify {
 }
 
 impl NCNotify {
-    pub fn new() -> Self {
-        let data = &config::get().data;
+    pub fn new(config: &Config) -> Self {
         NCNotify {
-            app_name: data.general.chat_server_name.clone(),
-            timeout: if data.notifications.persistent {
+            app_name: config.data.general.chat_server_name.clone(),
+            timeout: if config.data.notifications.persistent {
                 Timeout::Never
             } else {
-                Timeout::Milliseconds(data.notifications.timeout_ms)
+                Timeout::Milliseconds(config.data.notifications.timeout_ms)
             },
-            silent: data.notifications.silent,
+            silent: config.data.notifications.silent,
         }
     }
 

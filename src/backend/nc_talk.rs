@@ -4,7 +4,7 @@ use crate::{
         nc_request::{NCReqDataRoom, NCRequestInterface},
         nc_room::NCRoomInterface,
     },
-    config::{self},
+    config::Config,
 };
 use async_trait::async_trait;
 use itertools::Itertools;
@@ -122,10 +122,13 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             NCRoom::<Requester>::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
-    pub async fn new(requester: Requester) -> Result<NCTalk<Requester>, Box<dyn Error>> {
-        let notify = NCNotify::new();
+    pub async fn new(
+        requester: Requester,
+        config: &Config,
+    ) -> Result<NCTalk<Requester>, Box<dyn Error>> {
+        let notify = NCNotify::new(config);
 
-        let chat_log_path = config::get().get_server_data_dir();
+        let chat_log_path = config.get_server_data_dir();
         let mut tmp_path_buf = chat_log_path.clone();
         tmp_path_buf.push("Talk.json");
         let path = tmp_path_buf.as_path();
@@ -203,12 +206,9 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             requester,
             notifier: notify,
         };
-        log::info!(
-            "Entering default room {}",
-            &config::get().data.ui.default_room
-        );
+        log::info!("Entering default room {}", config.data.ui.default_room);
         talk.select_room(
-            talk.get_room_by_displayname(&config::get().data.ui.default_room)
+            talk.get_room_by_displayname(&config.data.ui.default_room)
                 .to_string(),
         )
         .await?;
@@ -447,7 +447,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_backend() {
-        let _ = init("./test/");
+        let config = init("./test/");
 
         let mut mock_requester = crate::backend::nc_request::MockNCRequest::new();
         let mut mock_requester_file = crate::backend::nc_request::MockNCRequest::new();
@@ -499,7 +499,7 @@ mod tests {
             .expect_clone()
             .return_once_st(|| mock_requester_room);
 
-        let backend = NCTalk::new(mock_requester)
+        let backend = NCTalk::new(mock_requester, &config)
             .await
             .expect("Failed to create Backend");
         assert_eq!(backend.rooms.len(), 1);
