@@ -98,6 +98,10 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
         &self,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    async fn fill_history<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &mut self,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
+    ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 /// Real implementation of the `NCRoom`.
@@ -443,6 +447,48 @@ impl NCRoomInterface for NCRoom {
                 }
                 Ordering::Equal => (),
             }
+        }
+        Ok(())
+    }
+
+    async fn fill_history<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &mut self,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_chat_update(
+                    &self.room_data.token,
+                    200,
+                    self.messages
+                        .get(
+                            self.messages
+                                .keys()
+                                .sorted()
+                                .last()
+                                .expect("Failed to sort messages by its keys."),
+                        )
+                        .ok_or("No last message")?
+                        .get_id(),
+                )
+                .await
+                .unwrap()
+        };
+        let response = response_onceshot
+            .await
+            .expect("Failed for fetch chat update")
+            .expect("Failed request");
+        if !response.is_empty() {
+            log::debug!(
+                "Updating {} adding {} new Messages",
+                self.to_string(),
+                response.len().to_string()
+            );
+        }
+        for message in response {
+            self.messages.insert(message.id, message.into());
         }
         Ok(())
     }
