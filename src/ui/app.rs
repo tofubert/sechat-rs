@@ -163,6 +163,10 @@ impl<'a, Backend: NCBackend> App<'a, Backend> {
         Ok(())
     }
 
+    pub async fn fetch_current_room_history(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.backend.fetch_current_room_history().await
+    }
+
     pub fn new_input_key(&mut self, key: Input) {
         self.input.input(key);
     }

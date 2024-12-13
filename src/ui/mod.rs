@@ -312,6 +312,7 @@ async fn handle_key_in_reading(
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
         KeyCode::Char('u') => app.toggle_user_sidebar(),
+        KeyCode::Char('f') => app.fetch_current_room_history().await?,
         _ => (),
     };
     Ok(())

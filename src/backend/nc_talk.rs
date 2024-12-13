@@ -32,6 +32,7 @@ pub trait NCBackend: Debug + Send + Default {
     async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>>;
     async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>>;
     async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
+    async fn fetch_current_room_history(&mut self) -> Result<(), Box<dyn Error>>;
     fn add_room(&mut self, room_option: Option<Self::Room>);
 }
 
@@ -390,6 +391,14 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         Ok(())
     }
 
+    async fn fetch_current_room_history(&mut self) -> Result<(), Box<dyn Error>> {
+        self.rooms
+            .get_mut(self.current_room_token.as_str())
+            .expect("Current Rooms seem to be missing.")
+            .fill_history()
+            .await
+    }
+
     fn add_room(&mut self, room_option: Option<Self::Room>) {
         if let Some(room) = room_option {
             self.rooms.insert(room.to_token(), room);
@@ -422,6 +431,7 @@ mock! {
         async fn send_message(& mut self, message: String) -> Result<(), Box<dyn Error>>;
         async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>>;
         async fn update_rooms(& mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
+        async fn fetch_current_room_history(&mut self) -> Result<(), Box<dyn Error>>;
         fn add_room(&mut self, room_option: Option<<MockNCTalk as NCBackend>::Room>);
     }
 }

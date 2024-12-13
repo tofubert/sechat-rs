@@ -347,34 +347,44 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
     }
 
     async fn fill_history(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let response = self
-            .requester
-            .fetch_chat_update(
-                self.room_data.token.as_str(),
-                200,
-                *(self
-                    .messages
-                    .first_key_value()
-                    .expect("Failed to sort messages by its keys.")
-                    .0)
-                    - 200,
-            )
-            .await
-            .unwrap();
-        if self.has_unread() && !response.is_empty() {
-            self.notifier
-                .unread_message(&self.room_data.displayName, response.len())?;
+        let mut fetch_key = 0;
+
+        let last_entry = *(self
+            .messages
+            .last_key_value()
+            .expect("Failed to sort messages by its keys.")
+            .0);
+
+        log::debug!(
+            "Fetching Full history. Size {}, First {}, Initial Fetch {}",
+            self.messages.len(),
+            last_entry,
+            fetch_key
+        );
+
+        while fetch_key <= last_entry && fetch_key >= 0 {
+            let response = self
+                .requester
+                .fetch_chat_update(self.room_data.token.as_str(), 200, fetch_key)
+                .await
+                .expect("Failed to get Chat Update");
+            if response.is_empty() {
+                break;
+            }
+            fetch_key = response.last().expect("No Messages fetched").id;
+
+            for message in response {
+                self.messages.insert(message.id, message.into());
+            }
         }
-        if !response.is_empty() {
-            log::debug!(
-                "Updating {} adding {} new Messages",
-                self.to_string(),
-                response.len().to_string()
-            );
-        }
-        for message in response {
-            self.messages.insert(message.id, message.into());
-        }
+
+        log::debug!(
+            "Updated Full history. Size {}, First {}, Final Fetch_key {}",
+            self.messages.len(),
+            last_entry,
+            fetch_key
+        );
+
         Ok(())
     }
 }
