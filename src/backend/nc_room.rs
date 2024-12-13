@@ -455,41 +455,51 @@ impl NCRoomInterface for NCRoom {
         &mut self,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let response_onceshot = {
-            requester
-                .lock()
+        let mut fetch_key = 0;
+
+        let last_entry = *(self
+            .messages
+            .last_key_value()
+            .expect("Failed to sort messages by its keys.")
+            .0);
+
+        log::debug!(
+            "Fetching Full history. Size {}, First {}, Initial Fetch {}",
+            self.messages.len(),
+            last_entry,
+            fetch_key
+        );
+
+        while fetch_key <= last_entry && fetch_key >= 0 {
+            let response_onceshot = {
+                requester
+                    .lock()
+                    .await
+                    .request_chat_update(&self.room_data.token, 200, fetch_key)
+                    .await
+                    .unwrap()
+            };
+            let response = response_onceshot
                 .await
-                .request_chat_update(
-                    &self.room_data.token,
-                    200,
-                    self.messages
-                        .get(
-                            self.messages
-                                .keys()
-                                .sorted()
-                                .last()
-                                .expect("Failed to sort messages by its keys."),
-                        )
-                        .ok_or("No last message")?
-                        .get_id(),
-                )
-                .await
-                .unwrap()
-        };
-        let response = response_onceshot
-            .await
-            .expect("Failed for fetch chat update")
-            .expect("Failed request");
-        if !response.is_empty() {
-            log::debug!(
-                "Updating {} adding {} new Messages",
-                self.to_string(),
-                response.len().to_string()
-            );
+                .expect("Failed for fetch chat update")
+                .expect("Failed request");
+            if response.is_empty() {
+                break;
+            }
+            fetch_key = response.last().expect("No Messages fetched").id;
+
+            for message in response {
+                self.messages.insert(message.id, message.into());
+            }
         }
-        for message in response {
-            self.messages.insert(message.id, message.into());
-        }
+
+        log::debug!(
+            "Updated Full history. Size {}, First {}, Final Fetch_key {}",
+            self.messages.len(),
+            last_entry,
+            fetch_key
+        );
+
         Ok(())
     }
 }

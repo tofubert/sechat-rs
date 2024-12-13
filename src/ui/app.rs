@@ -230,6 +230,12 @@ impl<Backend: NCBackend> App<'_, Backend> {
         Ok(())
     }
 
+    pub async fn fetch_current_room_history(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.backend
+            .fetch_room_history(&self.current_room_token)
+            .await
+    }
+
     pub fn new_input_key(&mut self, key: Input) {
         self.input.input(key);
     }
@@ -416,6 +422,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
             KeyCode::Char('?') => self.current_screen = CurrentScreen::Helping,
             KeyCode::Char('u') => self.toggle_user_sidebar(),
+            KeyCode::Char('f') => self.fetch_current_room_history().await?,
             _ => (),
         };
         Ok(())
