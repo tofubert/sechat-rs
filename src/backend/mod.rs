@@ -1,3 +1,4 @@
+//! Backend for API Communication to NC Talk Server
 pub mod nc_message;
 pub mod nc_notify;
 pub mod nc_request;
