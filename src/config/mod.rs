@@ -1,16 +1,13 @@
 mod data;
 mod theme;
 
-use color_eyre::eyre::eyre;
 use data::ConfigOptions;
 use etcetera::{app_strategy::Xdg, choose_app_strategy, AppStrategy, AppStrategyArgs};
 use log::LevelFilter;
 use serde::de::DeserializeOwned;
-use std::{path::Path, path::PathBuf, process::exit, sync::OnceLock};
+use std::{path::Path, path::PathBuf};
 use theme::{options::ColorPalette, Theme};
 use toml_example::TomlExample;
-
-static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Config {
@@ -19,7 +16,9 @@ pub struct Config {
     strategy: Xdg,
 }
 
-pub fn check_config_exists_else_create_new<T: TomlExample>(config_path: &Path) {
+pub fn check_config_exists_else_create_new<T: TomlExample>(
+    config_path: &Path,
+) -> Result<(), String> {
     if !config_path.exists() {
         println!(
             "Config files doesn't exist creating default now at {}.",
@@ -33,16 +32,22 @@ pub fn check_config_exists_else_create_new<T: TomlExample>(config_path: &Path) {
             .expect("Config Path has no parent")
             .exists()
         {
-            std::fs::create_dir_all(config_path.parent().expect("Config File has no Parent"))
-                .expect("Could not Create Config dir");
+            let Ok(()) =
+                std::fs::create_dir_all(config_path.parent().expect("Config File has no Parent"))
+            else {
+                return Err("Failed to create Config Dir. Make Sure Dir is creatable.".to_owned());
+            };
         }
         T::to_toml_example(config_path.as_os_str().to_str().unwrap()).unwrap();
         println!("Please Update the config with sensible values!");
-        exit(0);
+        return Err("Config File not Present yet!".to_owned());
     }
+    Ok(())
 }
 
-pub fn read_config_file<T: TomlExample + DeserializeOwned>(config_path: &PathBuf) -> T {
+pub fn read_config_file<T: TomlExample + DeserializeOwned>(
+    config_path: &PathBuf,
+) -> Result<T, String> {
     let data = match toml::from_str(&std::fs::read_to_string(config_path).unwrap()) {
         Ok(good_data) => good_data,
         Err(why) => {
@@ -56,13 +61,13 @@ pub fn read_config_file<T: TomlExample + DeserializeOwned>(config_path: &PathBuf
                     .expect("Failed to make config path into string")
             );
             T::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
-            exit(-1);
+            return Err("Failed to read Config File.".to_owned());
         }
     };
-    data
+    Ok(data)
 }
 
-pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
+pub fn init(path_arg: &str) -> Result<Config, String> {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "org".to_string(),
         author: "emlix".to_string(),
@@ -83,34 +88,17 @@ pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
-    check_config_exists_else_create_new::<ConfigOptions>(&config_path);
-    check_config_exists_else_create_new::<ColorPalette>(&theme_path);
+    check_config_exists_else_create_new::<ConfigOptions>(&config_path)?;
+    check_config_exists_else_create_new::<ColorPalette>(&theme_path)?;
 
-    let data = read_config_file::<ConfigOptions>(&config_path);
-    let theme_data = read_config_file::<ColorPalette>(&theme_path);
+    let data = read_config_file::<ConfigOptions>(&config_path)?;
+    let theme_data = read_config_file::<ColorPalette>(&theme_path)?;
 
     let mut config = Config::default();
     config.set_config_data(data);
     config.set_theme(theme_data);
     config.set_strategy(strategy);
-    CONFIG
-        .set(config)
-        .map_err(|config| eyre!("Failed to set config {config:?}"))
-}
-
-/// Get the application configuration.
-///
-/// This function should only be called after [`init()`] has been called.
-///
-/// # Panics
-///
-/// This function will panic if [`init()`] has not been called.
-pub fn get() -> &'static Config {
-    CONFIG.get().expect("config not initialized")
-}
-
-pub fn get_theme() -> &'static Theme {
-    &CONFIG.get().expect("config not initialized").theme
+    Ok(config)
 }
 
 impl Default for Config {
@@ -224,39 +212,61 @@ impl Config {
 mod tests {
     use ratatui::style::Color;
     use ratatui::style::Style;
+    use tempfile::tempdir;
 
     use super::*;
 
     #[test]
-    #[should_panic(
-        expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
-    )]
     fn init_with_faulty_path() {
-        assert!(init("/bogus_test/path").is_err());
+        let res = init("/bogus_test/path");
+        assert_eq!(
+            res.err(),
+            Some("Failed to create Config Dir. Make Sure Dir is creatable.".to_owned())
+        );
+    }
+
+    #[test]
+    fn init_empty_path() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let res = init("");
+        assert_eq!(res.err(), Some("Config File not Present yet!".to_owned()));
+    }
+
+    #[test]
+    fn init_without_existing_config() {
+        let tmp_dir = tempdir().unwrap();
+        let res = init(tmp_dir.path().to_str().unwrap());
+        assert_eq!(res.err(), Some("Config File not Present yet!".to_owned()));
     }
 
     #[test]
     fn default_values() {
-        // since we cant control the order of the tests we cannot be sure that this returns suchess.
-        let _ = init("./test/");
-        assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
-        assert!(get()
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+        assert!(config.get_data_dir().ends_with(".local/share/sechat-rs"));
+        assert!(config
             .get_server_data_dir()
             .ends_with(".local/share/sechat-rs/MyNCInstance"));
-        assert!(get()
+        assert!(config
             .get_http_dump_dir()
             .expect("Not Https Dump Dir found")
             .ends_with(".local/share/sechat-rs"));
-        assert!(get().get_enable_mouse());
-        assert!(get().get_enable_paste());
+        assert!(config.get_enable_mouse());
+        assert!(config.get_enable_paste());
     }
 
     #[test]
     fn default_theme() {
-        // since we cant control the order of the tests we cannot be sure that this returns suchess.
-        let _ = init("./test/");
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
         assert_eq!(
-            get_theme().default_style(),
+            config.theme.default_style(),
             Style::new().fg(Color::White).bg(Color::Black)
         );
     }

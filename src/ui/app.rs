@@ -1,6 +1,6 @@
 use crate::{
     backend::{nc_room::NCRoomInterface, nc_talk::NCBackend},
-    config::{self, get_theme},
+    config::Config,
     ui::{
         chat_box::ChatBox, chat_selector::ChatSelector, help_box::HelpBox, input_box::InputBox,
         title_bar::TitleBar, users::Users,
@@ -29,32 +29,35 @@ pub struct App<'a, Backend: NCBackend> {
     help: HelpBox,
     users: Users<'a>,
     user_sidebar_visible: bool,
+    default_style: Style,
 }
 
 impl<Backend: NCBackend> App<'_, Backend> {
-    pub fn new(backend: Backend) -> Self {
+    pub fn new(backend: Backend, config: &Config) -> Self {
         Self {
             current_screen: CurrentScreen::Reading,
             title: TitleBar::new(
                 CurrentScreen::Reading,
                 backend.get_current_room().to_string(),
+                config,
             ),
-            selector: ChatSelector::new(&backend),
-            input: InputBox::new(""),
+            selector: ChatSelector::new(&backend, config),
+            input: InputBox::new("", config),
             chat: {
-                let mut chat = ChatBox::new();
+                let mut chat = ChatBox::new(config);
                 chat.update_messages(&backend);
                 chat.select_last_message();
                 chat
             },
             users: {
-                let mut users = Users::new();
+                let mut users = Users::new(config);
                 users.update(&backend);
                 users
             },
             backend,
-            help: HelpBox::default(),
-            user_sidebar_visible: config::get().data.ui.user_sidebar_default,
+            help: HelpBox::new(config),
+            user_sidebar_visible: config.data.ui.user_sidebar_default,
+            default_style: config.theme.default_style(),
         }
     }
 
@@ -70,7 +73,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             f.render_widget(
                 Paragraph::new("To Quit Press 'y', to stay 'n'")
                     .alignment(Alignment::Center)
-                    .style(get_theme().default_style().bold()),
+                    .style(self.default_style.bold()),
                 base_layout[1],
             );
         } else if self.current_screen == CurrentScreen::Helping {

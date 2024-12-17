@@ -1,5 +1,5 @@
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
-use crate::config::get_theme;
+use crate::config::Config;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -16,15 +16,26 @@ pub struct ChatBox<'a> {
     current_index: usize,
     width: u16,
     state: TableState,
+    default_style: Style,
+    default_highlight_style: Style,
+    unread_message_style: Style,
+    table_header_style: Style,
 }
 
 impl ChatBox<'_> {
-    pub fn new() -> Self {
+    pub fn new(config: &Config) -> Self {
         ChatBox {
             messages: Vec::new(),
             current_index: 0,
             width: 10,
             state: TableState::default().with_offset(1).with_selected(0),
+            unread_message_style: config
+                .theme
+                .unread_message_style()
+                .add_modifier(Modifier::BOLD),
+            default_style: config.theme.default_style(),
+            default_highlight_style: config.theme.default_highlight_style(),
+            table_header_style: config.theme.table_header_style(),
         }
     }
 
@@ -95,13 +106,7 @@ impl ChatBox<'_> {
                 let unread_marker: Vec<Cell> = vec![
                     "".into(),
                     "".into(),
-                    Span::styled(
-                        "+++ LAST READ +++",
-                        get_theme()
-                            .unread_message_style()
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .into(),
+                    Span::styled("+++ LAST READ +++", self.unread_message_style).into(),
                 ];
                 self.messages.push(Row::new(unread_marker));
             }
@@ -161,13 +166,10 @@ impl StatefulWidget for &ChatBox<'_> {
         StatefulWidget::render(
             Table::new(self.messages.clone(), widths)
                 .column_spacing(1)
-                .style(get_theme().default_style())
-                .header(
-                    Row::new(vec!["Time", "Name", "Message"])
-                        .style(get_theme().table_header_style()),
-                )
+                .style(self.default_style)
+                .header(Row::new(vec!["Time", "Name", "Message"]).style(self.table_header_style))
                 .block(Block::default())
-                .row_highlight_style(get_theme().default_highlight_style())
+                .row_highlight_style(self.default_highlight_style)
                 .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,

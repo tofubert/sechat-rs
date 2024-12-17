@@ -11,15 +11,17 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::backend::nc_room::NCRoomInterface;
 use crate::backend::nc_talk::NCBackend;
-use crate::config::get_theme;
+use crate::config::Config;
 
 pub struct ChatSelector<'a> {
     pub state: TreeState<String>,
     items: Vec<TreeItem<'a, String>>,
+    default_style: Style,
+    default_highlight_style: Style,
 }
 
 impl ChatSelector<'_> {
-    pub fn new(backend: &impl NCBackend) -> Self {
+    pub fn new(backend: &impl NCBackend, config: &Config) -> Self {
         Self {
             state: TreeState::default(),
             items: vec![
@@ -63,6 +65,8 @@ impl ChatSelector<'_> {
                 )
                 .expect("Group name duplicate"),
             ],
+            default_style: config.theme.default_style(),
+            default_highlight_style: config.theme.default_highlight_style(),
         }
     }
 
@@ -118,8 +122,8 @@ impl ChatSelector<'_> {
                     .track_symbol(None)
                     .end_symbol(None),
             ))
-            .style(get_theme().default_style())
-            .highlight_style(get_theme().default_highlight_style().bold())
+            .style(self.default_style)
+            .highlight_style(self.default_highlight_style.bold())
             .highlight_symbol(">> ");
         frame.render_stateful_widget(widget, area, &mut self.state);
     }

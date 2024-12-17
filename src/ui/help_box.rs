@@ -1,13 +1,24 @@
-use crate::config::get_theme;
+use crate::config::Config;
 use ratatui::{
     prelude::*,
     widgets::{Block, HighlightSpacing, Row, Table},
 };
 
 #[derive(Default)]
-pub struct HelpBox {}
+pub struct HelpBox {
+    default: Style,
+    default_highlight: Style,
+    table_header: Style,
+}
 
 impl HelpBox {
+    pub fn new(config: &Config) -> Self {
+        HelpBox {
+            default: config.theme.default_style(),
+            default_highlight: config.theme.default_highlight_style(),
+            table_header: config.theme.table_header_style(),
+        }
+    }
     pub fn render_area(&self, frame: &mut Frame, area: Rect) {
         frame.render_widget(self, area);
     }
@@ -51,10 +62,10 @@ impl Widget for &HelpBox {
                 ],
             )
             .column_spacing(1)
-            .style(get_theme().default_style())
-            .header(Row::new(vec!["Key", "Name", "Behavior"]).style(get_theme().table_header_style()))
+            .style(self.default)
+            .header(Row::new(vec!["Key", "Name", "Behavior"]).style(self.table_header))
             .block(Block::default())
-            .row_highlight_style(get_theme().default_highlight_style())
+            .row_highlight_style(self.default_highlight)
             .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,
