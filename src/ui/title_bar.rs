@@ -103,3 +103,60 @@ impl Widget for &TitleBar<'_> {
             .render(title_layout[2], buf);
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::backend::{
+        nc_request::NCReqDataParticipants, nc_room::MockNCRoomInterface, nc_talk::MockNCTalk,
+    };
+    use crate::config::init;
+    use backend::TestBackend;
+
+    use super::*;
+
+    #[test]
+    fn render() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+
+        let mut mock_nc_backend = MockNCTalk::new();
+        let backend = TestBackend::new(30, 3);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut bar = TitleBar::new(CurrentScreen::Reading, "General".to_string(), &config);
+
+        let mut mock_room = MockNCRoomInterface::new();
+        let mut dummy_user = NCReqDataParticipants::default();
+        dummy_user.displayName = "Butz".to_string();
+        mock_room.expect_get_users().return_const(vec![dummy_user]);
+        mock_room.expect_get_unread().return_const(false);
+        mock_nc_backend
+            .expect_get_unread_rooms()
+            .once()
+            .return_const(vec![]);
+        mock_nc_backend
+            .expect_get_current_room()
+            .times(2)
+            .return_const(mock_room);
+        bar.update(CurrentScreen::Reading, &mock_nc_backend);
+
+        terminal
+            .draw(|frame| bar.render_area(frame, Rect::new(0, 0, 30, 3)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "Current: Butz           Readin",
+            "                              ",
+            "──────────────────────────────",
+        ]);
+        expected.set_style(Rect::new(0, 0, 30, 3), config.theme.default_style());
+
+        expected.set_style(Rect::new(0, 0, 13, 1), config.theme.title_status_style());
+
+        expected.set_style(Rect::new(24, 0, 6, 1), config.theme.title_status_style());
+
+        terminal.backend().assert_buffer(&expected);
+    }
+}
