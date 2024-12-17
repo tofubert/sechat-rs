@@ -167,7 +167,7 @@ impl StatefulWidget for &ChatBox<'_> {
                         .style(get_theme().table_header_style()),
                 )
                 .block(Block::default())
-                .highlight_style(get_theme().default_highlight_style())
+                .row_highlight_style(get_theme().default_highlight_style())
                 .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,

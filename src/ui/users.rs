@@ -70,7 +70,7 @@ impl StatefulWidget for &Users<'_> {
                 .style(config::get_theme().default_style())
                 .header(Row::new(vec!["Users"]).style(config::get_theme().table_header_style()))
                 .block(Block::default())
-                .highlight_style(Style::new().bold())
+                .row_highlight_style(Style::new().bold())
                 .highlight_spacing(HighlightSpacing::Never)
                 .highlight_symbol("")
                 .block(Block::new().borders(Borders::LEFT)),

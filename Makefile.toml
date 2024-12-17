@@ -57,13 +57,13 @@ dependencies = ["audit", "deny"]
 [tasks.audit]
 command = "cargo"
 install_crate = "cargo-audit"
-args = ["audit", "-D", "warnings", "--ignore", "RUSTSEC-2024-0388"]
+args = ["audit"]
 
 
 [tasks.deny]
 command = "cargo"
 install_crate = "cargo-deny"
-args = ["deny", "check", "bans", "licenses"]
+args = ["deny", "check", "bans", "licenses", "--exclude-dev"]
 
 
 [tasks.check]

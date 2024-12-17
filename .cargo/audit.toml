@@ -1,0 +1,24 @@
+
+
+[advisories]
+# 2024-0388 derivative is unmaintained a PR is open on log4rs but blocked...
+ignore = ["RUSTSEC-2024-0388"]
+informational_warnings = []
+severity_threshold = "low" # CVSS severity ("none", "low", "medium", "high", "critical")
+
+
+# Output Configuration
+[output]
+deny = ["warnings"]
+format = "terminal" # "terminal" (human readable report) or "json"
+quiet = false # Only print information on error
+show_tree = true # Show inverse dependency trees along with advisories (default: true)
+
+# Target Configuration
+[target]
+arch = ["x86_64"] # Ignore advisories for CPU architectures other than these
+os = ["linux"] # Ignore advisories for operating systems other than these
+
+[yanked]
+enabled = true # Warn for yanked crates in Cargo.lock (default: true)
+update_index = true # Auto-update the crates.io index (default: true)
