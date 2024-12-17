@@ -31,7 +31,7 @@ pub struct App<'a, Backend: NCBackend> {
     user_sidebar_visible: bool,
 }
 
-impl<'a, Backend: NCBackend> App<'a, Backend> {
+impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend) -> Self {
         Self {
             current_screen: CurrentScreen::Reading,
