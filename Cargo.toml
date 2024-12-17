@@ -75,5 +75,8 @@ tui-textarea = "0.7.0"
 async-trait = "0.1.83"
 serde_with = "3.11.0"
 
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
 [lints.clippy]
-pedantic = "warn"
+pedantic = "deny"
