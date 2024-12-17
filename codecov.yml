@@ -6,7 +6,13 @@ coverage: # https://docs.codecov.com/docs/codecovyml-reference#coverage
     project:
       default:
         threshold: 10% # Avoid false negatives, while numbers are so low.
+    patch:
+      default:
+        threshold: 2%
 
 comment: # https://docs.codecov.com/docs/pull-request-comments
   # make the comments less noisy
   require_changes: true
+
+github_checks:
+  annotations: false #Make commit readable again.

@@ -10,6 +10,10 @@ alias = "ci"
 description = "Run continuous integration tasks"
 dependencies = ["lint", "clippy", "check", "test"]
 
+[tasks.all]
+description = "Run all tasks"
+dependencies = ["format", "lint-typos", "clippy", "check", "dependencies", "build", "coverage-text"]
+
 
 [tasks.clippy]
 description = "Run Clippy for linting"
@@ -29,7 +33,7 @@ args = [
 
 [tasks.lint]
 description = "Lint code style (formatting, typos, docs, markdown)"
-dependencies = ["lint-format"]
+dependencies = ["lint-format", "lint-typos"]
 
 [tasks.lint-format]
 description = "Lint code formatting"
@@ -46,10 +50,20 @@ description = "Run typo checks"
 install_crate = { crate_name = "typos-cli", binary = "typos", test_arg = "--version" }
 command = "typos"
 
+[tasks.dependencies]
+description = "Lint code style (formatting, typos, docs, markdown)"
+dependencies = ["audit", "deny"]
+
 [tasks.audit]
 command = "cargo"
 install_crate = "cargo-audit"
-args = ["audit", "-D", "warnings"]
+args = ["audit", "-D", "warnings", "--ignore", "RUSTSEC-2024-0388"]
+
+
+[tasks.deny]
+command = "cargo"
+install_crate = "cargo-deny"
+args = ["deny", "check", "bans", "licenses"]
 
 
 [tasks.check]
@@ -67,10 +81,17 @@ args = [
   "target/lcov.info",
 ]
 
+[tasks.coverage-text]
+description = "Generate code coverage report"
+command = "cargo"
+args = [
+  "llvm-cov",
+]
+
 [tasks.build]
 command = "cargo"
 args = ["build"]
-dependencies = ["format", "clippy", "audit"]
+dependencies = ["lint-format", "clippy", "audit"]
 
 [tasks.test]
 command = "cargo"

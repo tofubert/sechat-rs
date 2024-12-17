@@ -1,21 +1,68 @@
 mod data;
+mod theme;
 
 use color_eyre::eyre::eyre;
-use data::Data;
+use data::ConfigOptions;
 use etcetera::{app_strategy::Xdg, choose_app_strategy, AppStrategy, AppStrategyArgs};
 use log::LevelFilter;
-use std::{path::PathBuf, process::exit, sync::OnceLock};
+use serde::de::DeserializeOwned;
+use std::{path::Path, path::PathBuf, process::exit, sync::OnceLock};
+use theme::{options::ColorPalette, Theme};
 use toml_example::TomlExample;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Config {
-    pub data: Data,
+    pub data: ConfigOptions,
+    pub theme: Theme,
     strategy: Xdg,
 }
 
-pub fn init(path_arg: &str) {
+pub fn check_config_exists_else_create_new<T: TomlExample>(config_path: &Path) {
+    if !config_path.exists() {
+        println!(
+            "Config files doesn't exist creating default now at {}.",
+            config_path
+                .as_os_str()
+                .to_str()
+                .expect("Failed to make config path into string")
+        );
+        if !config_path
+            .parent()
+            .expect("Config Path has no parent")
+            .exists()
+        {
+            std::fs::create_dir_all(config_path.parent().expect("Config File has no Parent"))
+                .expect("Could not Create Config dir");
+        }
+        T::to_toml_example(config_path.as_os_str().to_str().unwrap()).unwrap();
+        println!("Please Update the config with sensible values!");
+        exit(0);
+    }
+}
+
+pub fn read_config_file<T: TomlExample + DeserializeOwned>(config_path: &PathBuf) -> T {
+    let data = match toml::from_str(&std::fs::read_to_string(config_path).unwrap()) {
+        Ok(good_data) => good_data,
+        Err(why) => {
+            println!("Please Update your config {why} ");
+            let example_config_path = config_path.join("_new");
+            println!(
+                "Writing example config to {}",
+                example_config_path
+                    .as_os_str()
+                    .to_str()
+                    .expect("Failed to make config path into string")
+            );
+            T::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
+            exit(-1);
+        }
+    };
+    data
+}
+
+pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
     let strategy = choose_app_strategy(AppStrategyArgs {
         top_level_domain: "org".to_string(),
         author: "emlix".to_string(),
@@ -31,56 +78,24 @@ pub fn init(path_arg: &str) {
         );
         path_arg.into()
     };
-    let mut config_path = config_path_base.clone();
-    config_path.push("config.toml");
+    let config_path = config_path_base.join("config.toml");
+    let theme_path = config_path_base.join("theme.toml");
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
-    if !config_path.exists() {
-        println!(
-            "Config files doesnt exist creating default now at {}.",
-            config_path
-                .as_os_str()
-                .to_str()
-                .expect("Failed to make config path into string")
-        );
-        if !config_path
-            .parent()
-            .expect("Config Path has no parent")
-            .exists()
-        {
-            std::fs::create_dir_all(config_path.parent().expect("Config File has no Parent"))
-                .expect("Could not Create Config dir");
-        }
-        Data::to_toml_example(config_path.as_os_str().to_str().unwrap()).unwrap();
-        println!("Please Update the config with sensible values!");
-        exit(0);
-    }
-    let data = match toml::from_str(&std::fs::read_to_string(config_path).unwrap()) {
-        Ok(good_data) => good_data,
-        Err(why) => {
-            println!("Please Update your config {why} ");
-            let mut example_config_path = config_path_base.clone();
-            example_config_path.push("config.toml_new");
-            println!(
-                "Writing example config to {}",
-                example_config_path
-                    .as_os_str()
-                    .to_str()
-                    .expect("Failed to make config path into string")
-            );
-            Data::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
-            exit(-1);
-        }
-    };
+    check_config_exists_else_create_new::<ConfigOptions>(&config_path);
+    check_config_exists_else_create_new::<ColorPalette>(&theme_path);
+
+    let data = read_config_file::<ConfigOptions>(&config_path);
+    let theme_data = read_config_file::<ColorPalette>(&theme_path);
 
     let mut config = Config::default();
     config.set_config_data(data);
+    config.set_theme(theme_data);
     config.set_strategy(strategy);
     CONFIG
         .set(config)
-        .map_err(|config| eyre!("failed to set config {config:?}"))
-        .expect("Could not set global config!");
+        .map_err(|config| eyre!("Failed to set config {config:?}"))
 }
 
 /// Get the application configuration.
@@ -94,10 +109,15 @@ pub fn get() -> &'static Config {
     CONFIG.get().expect("config not initialized")
 }
 
+pub fn get_theme() -> &'static Theme {
+    &CONFIG.get().expect("config not initialized").theme
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
-            data: Data::default(),
+            data: ConfigOptions::default(),
+            theme: Theme::default(),
             strategy: choose_app_strategy(AppStrategyArgs {
                 top_level_domain: "org".to_string(),
                 author: "emlix".to_string(),
@@ -109,8 +129,11 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn set_config_data(&mut self, data: Data) {
+    pub fn set_config_data(&mut self, data: ConfigOptions) {
         self.data = data;
+    }
+    pub fn set_theme(&mut self, data: ColorPalette) {
+        self.theme.set_theme(data);
     }
     pub fn set_strategy(&mut self, strategy: Xdg) {
         self.strategy = strategy;
@@ -127,8 +150,10 @@ impl Config {
         self.strategy.data_dir()
     }
     pub fn get_server_data_dir(&self) -> PathBuf {
-        let mut path = self.strategy.data_dir();
-        path.push(self.data.general.chat_server_name.clone());
+        let path = self
+            .strategy
+            .data_dir()
+            .join(self.data.general.chat_server_name.clone());
         if !path.exists() {
             std::fs::create_dir_all(path.clone()).expect("Failed to create server data path");
         }
@@ -154,8 +179,7 @@ impl Config {
             filter::threshold::ThresholdFilter,
         };
 
-        let mut log_path = self.strategy.data_dir().clone();
-        log_path.push("app.log");
+        let log_path = self.strategy.data_dir().join("app.log");
 
         // Build a stderr logger.
         let stderr = ConsoleAppender::builder()
@@ -164,7 +188,7 @@ impl Config {
             .build();
 
         // Logging to log file.
-        let logfile = FileAppender::builder()
+        let log_file = FileAppender::builder()
             // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
             .encoder(Box::new(PatternEncoder::new(
                 "{d(%H:%M:%S)} {l} {M}: {m}{n}",
@@ -185,7 +209,7 @@ impl Config {
         let mut root = Root::builder().appender("stderr");
         if self.data.general.log_to_file {
             config_builder =
-                config_builder.appender(Appender::builder().build("logfile", Box::new(logfile)));
+                config_builder.appender(Appender::builder().build("logfile", Box::new(log_file)));
             root = root.appender("logfile");
         }
         let config = config_builder
@@ -198,28 +222,69 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    // use super::*;
+    use ratatui::style::Color;
+    use ratatui::style::Style;
 
-    #[test]
-    #[should_panic(expected = "config not initialized")]
-    fn get_config_before_init() {
-        super::get();
-    }
+    use super::*;
+
     #[test]
     #[should_panic(
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
     )]
     fn init_with_faulty_path() {
-        super::init("/test");
+        assert!(init("/bogus_test/path").is_err());
     }
+
     #[test]
-    fn init_with_no_path() {
-        super::init("");
+    fn default_values() {
+        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let _ = init("./test/");
+        assert!(get().get_data_dir().ends_with(".local/share/sechat-rs"));
+        assert!(get()
+            .get_server_data_dir()
+            .ends_with(".local/share/sechat-rs/MyNCInstance"));
+        assert!(get()
+            .get_http_dump_dir()
+            .expect("Not Https Dump Dir found")
+            .ends_with(".local/share/sechat-rs"));
+        assert!(get().get_enable_mouse());
+        assert!(get().get_enable_paste());
     }
+
     #[test]
-    #[should_panic(expected = "Could not set global config!: failed to set config Config")]
-    fn init_config_twice() {
-        super::init("");
-        super::init("");
+    fn default_theme() {
+        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let _ = init("./test/");
+        assert_eq!(
+            get_theme().default_style(),
+            Style::new().fg(Color::White).bg(Color::Black)
+        );
+    }
+
+    #[test]
+    fn init_logging() {
+        let conf = Config::default();
+        conf.config_logging();
+    }
+
+    #[test]
+    fn update_data() {
+        let mut conf = Config::default();
+        conf.set_config_data(ConfigOptions::default());
+        conf.set_strategy(
+            choose_app_strategy(AppStrategyArgs {
+                top_level_domain: "org".to_string(),
+                author: "emlix".to_string(),
+                app_name: "sechat-rs".to_string(),
+            })
+            .unwrap(),
+        );
+        assert!(conf.get_data_dir().ends_with(".local/share/sechat-rs"));
+        assert!(conf
+            .get_server_data_dir()
+            .ends_with(".local/share/sechat-rs"));
+        assert!(conf.get_http_dump_dir().is_none());
+        assert!(!conf.get_enable_mouse());
+        assert!(!conf.get_enable_paste());
     }
 }

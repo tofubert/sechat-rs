@@ -1,10 +1,12 @@
-use crate::{backend::nc_talk::NCTalk, ui::app::CurrentScreen};
+use crate::backend::nc_room::NCRoomInterface;
+use crate::config::get_theme;
+use crate::{backend::nc_talk::NCBackend, ui::app::CurrentScreen};
+
 use num_traits::AsPrimitive;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Paragraph},
 };
-use std::string::ToString;
 use style::Styled;
 
 pub struct TitleBar<'a> {
@@ -14,8 +16,8 @@ pub struct TitleBar<'a> {
     unread_rooms: Text<'a>,
 }
 
-impl<'a> TitleBar<'a> {
-    pub fn new(initial_state: CurrentScreen, room: String) -> TitleBar<'a> {
+impl TitleBar<'_> {
+    pub fn new(initial_state: CurrentScreen, room: String) -> Self {
         TitleBar {
             room,
             mode: initial_state.to_string(),
@@ -24,7 +26,7 @@ impl<'a> TitleBar<'a> {
         }
     }
 
-    pub fn update(&mut self, screen: CurrentScreen, backend: &NCTalk) {
+    pub fn update(&mut self, screen: CurrentScreen, backend: &impl NCBackend) {
         self.mode = screen.to_string();
         self.room = backend.get_current_room().to_string();
         self.unread = backend.get_current_room().get_unread();
@@ -32,7 +34,7 @@ impl<'a> TitleBar<'a> {
             .get_unread_rooms()
             .iter()
             .map(|token| {
-                let room = backend.get_room_by_token(token);
+                let room = backend.get_room(token);
                 format!("{room}: {}", room.get_unread())
             })
             .collect();
@@ -40,7 +42,7 @@ impl<'a> TitleBar<'a> {
             Text::raw("")
         } else {
             Text::raw("UNREAD: ".to_owned() + unread_array.join(", ").as_str())
-                .set_style(Style::default().white().on_red().rapid_blink().bold())
+                .set_style(get_theme().title_important_style().rapid_blink())
         };
     }
 
@@ -49,17 +51,17 @@ impl<'a> TitleBar<'a> {
     }
 }
 
-impl<'a> Widget for &TitleBar<'a> {
+impl Widget for &TitleBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let (room_title, room_title_style) = if self.unread > 0 {
             (
                 format!("Current: {}: {}", self.room, self.unread),
-                Style::default().fg(Color::White).bg(Color::Red),
+                get_theme().title_status_style(),
             )
         } else {
             (
                 format!("Current: {}", self.room),
-                Style::default().fg(Color::Green),
+                get_theme().title_status_style(),
             )
         };
 
@@ -74,7 +76,7 @@ impl<'a> Widget for &TitleBar<'a> {
 
         let title_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(Style::default());
+            .style(get_theme().default_style());
 
         Paragraph::new(Text::styled(room_title, room_title_style))
             .block(title_block)
@@ -82,7 +84,7 @@ impl<'a> Widget for &TitleBar<'a> {
 
         let unread_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(Style::default());
+            .style(get_theme().default_style());
 
         Paragraph::new(self.unread_rooms.clone())
             .block(unread_block)
@@ -90,11 +92,11 @@ impl<'a> Widget for &TitleBar<'a> {
 
         let mode_block = Block::default()
             .borders(Borders::BOTTOM)
-            .style(Style::default());
+            .style(get_theme().default_style());
 
         Paragraph::new(Text::styled(
             self.mode.clone(),
-            Style::default().fg(Color::Green),
+            get_theme().title_status_style(),
         ))
         .block(mode_block)
         .alignment(Alignment::Right)

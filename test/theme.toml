@@ -1,0 +1,47 @@
+# Valid Color Values can be:
+# String, e.g. "white", see <https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html>
+# indexed, e.g. "10", see <https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit>
+# hex, e.g. "#a03f49", see <https://docs.rs/ratatui/latest/ratatui/style/enum.Color.html#method.deserialize>
+# `toml_example` seems to not handle index and hex well, so the default is pure strings
+# Default Background
+background = "black"
+
+# Default Text Colour
+foreground = "white"
+
+# Background for highlighted lines
+background_highlight = "darkgrey"
+
+# Foreground for highlighted lines
+foreground_highlight = "white"
+
+# background for unread message highlight
+background_unread_message = "lightgray"
+
+# Foreground for unread message highlight
+foreground_unread_message = "darkgray"
+
+# Text Colour for Chat and User table Headers
+table_header = "blue"
+
+# Text Colour for titlebar contents
+foreground_titlebar = "darkgray"
+
+# Text Colour for titlebar contents
+background_important_titlebar = "blue"
+
+# Text Colour for titlebar contents
+foreground_important_titlebar = "white"
+
+# Foreground for Away Users
+user_away = "blue"
+
+# Foreground for DND Users
+user_dnd = "red"
+
+# Foreground for Offline Users
+user_offline = "gray"
+
+# Foreground for Online Users
+user_online = "green"
+

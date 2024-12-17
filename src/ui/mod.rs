@@ -4,35 +4,34 @@ pub mod chat_selector;
 pub mod help_box;
 pub mod input_box;
 pub mod title_bar;
+pub mod users;
+
+use crate::backend::{nc_request::NCRequest, nc_talk::NCTalk};
 
 use super::{
-    backend::nc_talk::NCTalk,
-    config::{self},
+    config,
     ui::app::{App, CurrentScreen},
 };
 use cfg_if::cfg_if;
 use color_eyre::{
     config::{EyreHook, HookBuilder, PanicHook},
-    eyre::{self, Result},
+    eyre,
 };
 use crossterm::{
     event::{
-        self, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste, EnableMouseCapture,
-        Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind,
+        poll, read, DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste,
+        EnableMouseCapture, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+        KeyboardEnhancementFlags, MouseEventKind, PopKeyboardEnhancementFlags,
+        PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::prelude::*;
-use std::{
-    error::Error,
-    io::{stdout, Stdout},
-    panic,
-    time::Duration,
-};
 use tracing::error;
+use tui_textarea::{Input, Key};
 
-pub fn install_hooks() -> Result<()> {
+pub fn install_hooks() -> eyre::Result<()> {
     let (panic_hook, eyre_hook) = HookBuilder::default()
         .panic_section(format!(
             "This is a bug. Consider reporting it at {}",
@@ -68,12 +67,12 @@ fn install_color_eyre_panic_hook(panic_hook: PanicHook) {
     // convert from a `color_eyre::config::PanicHook`` to a `Box<dyn
     // Fn(&PanicInfo<'_>`
     let panic_hook = panic_hook.into_panic_hook();
-    panic::set_hook(Box::new(move |panic_info| {
+    std::panic::set_hook(Box::new(move |panic_info| {
         if let Err(err) = restore() {
             error!("Unable to restore terminal: {err:?}");
         }
 
-        // not sure about this
+        // TODO not sure about this
         // let msg = format!("{}", panic_hook.panic_report(panic_info));
         // error!("Error: {}", strip_ansi_escapes::strip_str(msg));
         panic_hook(panic_info);
@@ -89,11 +88,21 @@ fn install_eyre_hook(eyre_hook: EyreHook) -> color_eyre::Result<()> {
     Ok(())
 }
 
-pub type Tui = Terminal<CrosstermBackend<Stdout>>;
+pub type Tui = Terminal<CrosstermBackend<std::io::Stdout>>;
 
-pub fn init() -> Result<Tui> {
+pub fn init() -> eyre::Result<Tui> {
+    use std::io::stdout;
+
     enable_raw_mode()?;
     execute!(stdout(), EnterAlternateScreen)?;
+    if execute!(
+        stdout(),
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
+    )
+    .is_err()
+    {
+        log::warn!("Consider using a Terminal that supports KeyboardEnhancementFlags.");
+    }
     if config::get().get_enable_mouse() {
         execute!(stdout(), EnableMouseCapture)?;
     }
@@ -106,15 +115,21 @@ pub fn init() -> Result<Tui> {
     Ok(terminal)
 }
 
-pub fn restore() -> Result<()> {
+pub fn restore() -> eyre::Result<()> {
+    use std::io::stdout;
+
     if config::get().get_enable_paste() {
         execute!(stdout(), DisableBracketedPaste)?;
     }
     if config::get().get_enable_mouse() {
         execute!(stdout(), DisableMouseCapture)?;
     }
+
+    //proceed here regardless of error, since this will fail if the terminal doesn't support this.
+    let _ = execute!(stdout(), PopKeyboardEnhancementFlags);
     execute!(stdout(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
+
     Ok(())
 }
 
@@ -123,7 +138,7 @@ enum ProcessEventResult {
     Exit,
 }
 
-pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn Error>> {
+pub async fn run(nc_backend: NCTalk<NCRequest>) -> Result<(), Box<dyn std::error::Error>> {
     install_hooks()?;
 
     // create app and run it
@@ -139,16 +154,16 @@ pub async fn run(nc_backend: NCTalk) -> Result<(), Box<dyn Error>> {
 
 async fn run_app<B: Backend>(
     mut terminal: Terminal<B>,
-    mut app: App<'_>,
-) -> Result<(), Box<dyn Error>> {
+    mut app: App<'_, NCTalk<NCRequest>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     app.select_room().await?;
     log::debug!("Entering Main Loop");
     loop {
         terminal.draw(|f| app.ui(f))?;
 
         // Event within timeout?
-        if event::poll(Duration::from_millis(3000))? {
-            match process_event(&mut app, event::read()?).await {
+        if poll(std::time::Duration::from_millis(3000))? {
+            match process_event(&mut app, read()?).await {
                 Ok(ProcessEventResult::Continue) => (),
                 Ok(ProcessEventResult::Exit) => return Ok(()),
                 Err(why) => return Err(why),
@@ -162,14 +177,14 @@ async fn run_app<B: Backend>(
 }
 
 async fn process_event(
-    app: &mut App<'_>,
+    app: &mut App<'_, NCTalk<NCRequest>>,
     event: Event,
-) -> Result<ProcessEventResult, Box<dyn Error>> {
+) -> Result<ProcessEventResult, Box<dyn std::error::Error>> {
     // It's guaranteed that `read` won't block, because `poll` returned
     // `Ok(true)`.
     match event {
-        Event::Key(key) if key.kind != event::KeyEventKind::Release => {
-            log::debug!("Processing key event {:?}", key.code);
+        Event::Key(key) => {
+            log::debug!("Processing key event {:?}", key);
             match app.current_screen {
                 CurrentScreen::Helping => handle_key_in_help(key, app),
                 CurrentScreen::Reading => handle_key_in_reading(key, app).await?,
@@ -178,7 +193,9 @@ async fn process_event(
                         return value;
                     }
                 }
-                CurrentScreen::Editing => handle_key_in_editing(key, app).await?,
+                CurrentScreen::Editing => {
+                    handle_key_in_editing(Input::from(event.clone()), app).await?;
+                }
                 CurrentScreen::Opening => handle_key_in_opening(key, app).await?,
             }
         }
@@ -190,15 +207,17 @@ async fn process_event(
             }
             _ => (),
         },
-        _ => (),
+        _ => {
+            log::debug!("Unknown Event {:?}", event);
+        }
     }
     Ok(ProcessEventResult::Continue)
 }
 
 async fn handle_key_in_opening(
-    key: event::KeyEvent,
-    app: &mut App<'_>,
-) -> Result<(), Box<dyn Error>> {
+    key: KeyEvent,
+    app: &mut App<'_, NCTalk<NCRequest>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
         KeyCode::Char('h') | KeyCode::Left => _ = app.selector.state.key_left(),
@@ -219,27 +238,27 @@ async fn handle_key_in_opening(
 }
 
 async fn handle_key_in_editing(
-    key: event::KeyEvent,
-    app: &mut App<'_>,
-) -> Result<(), Box<dyn Error>> {
-    if key.kind == KeyEventKind::Press {
-        match key.code {
-            KeyCode::Enter => {
-                // SEND MEssage
-                app.current_screen = CurrentScreen::Reading;
-                app.send_message().await?;
-            }
-            KeyCode::Backspace => app.pop_input(),
-            KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
-            KeyCode::Char(value) => app.append_input(value),
-            _ => (),
-        };
-    }
+    key: Input,
+    app: &mut App<'_, NCTalk<NCRequest>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    match key {
+        Input { key: Key::Esc, .. } => app.current_screen = CurrentScreen::Reading,
+        Input {
+            key: Key::Enter,
+            shift: false,
+            ..
+        } => {
+            // SEND MEssage
+            app.current_screen = CurrentScreen::Reading;
+            app.send_message().await?;
+        }
+        _ => app.new_input_key(key),
+    };
 
     Ok(())
 }
 
-fn handle_key_in_help(key: event::KeyEvent, app: &mut App) {
+fn handle_key_in_help(key: KeyEvent, app: &mut App<'_, NCTalk<NCRequest>>) {
     match key.code {
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Esc => app.current_screen = CurrentScreen::Reading,
@@ -249,9 +268,9 @@ fn handle_key_in_help(key: event::KeyEvent, app: &mut App) {
 }
 
 fn handle_key_in_exit(
-    key: event::KeyEvent,
-    app: &mut App,
-) -> Option<Result<ProcessEventResult, Box<dyn Error>>> {
+    key: KeyEvent,
+    app: &mut App<'_, NCTalk<NCRequest>>,
+) -> Option<Result<ProcessEventResult, Box<dyn std::error::Error>>> {
     match key.code {
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
         KeyCode::Char('y') => {
@@ -270,9 +289,9 @@ fn handle_key_in_exit(
 }
 
 async fn handle_key_in_reading(
-    key: event::KeyEvent,
-    app: &mut App<'_>,
-) -> Result<(), Box<dyn Error>> {
+    key: KeyEvent,
+    app: &mut App<'_, NCTalk<NCRequest>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     match key.code {
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.current_screen = CurrentScreen::Exiting;
@@ -284,6 +303,7 @@ async fn handle_key_in_reading(
         KeyCode::Char('o') => app.current_screen = CurrentScreen::Opening,
         KeyCode::Char('q') => app.current_screen = CurrentScreen::Exiting,
         KeyCode::Char('?') => app.current_screen = CurrentScreen::Helping,
+        KeyCode::Char('u') => app.toggle_user_sidebar(),
         _ => (),
     };
     Ok(())

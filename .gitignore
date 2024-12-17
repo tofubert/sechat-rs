@@ -1,10 +1,4 @@
-config.toml
 Cargo.lock
 target
-dev.log
-logs
-devlogs
-config_*.toml
-CONFIG_*.toml
 .vscode/settings.json
 .pre-commit-config.yaml
