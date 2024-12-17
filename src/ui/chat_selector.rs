@@ -11,15 +11,17 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::backend::nc_room::NCRoomInterface;
 use crate::backend::nc_talk::NCBackend;
-use crate::config::get_theme;
+use crate::config::Config;
 
 pub struct ChatSelector<'a> {
     pub state: TreeState<String>,
     items: Vec<TreeItem<'a, String>>,
+    default_style: Style,
+    default_highlight_style: Style,
 }
 
 impl ChatSelector<'_> {
-    pub fn new(backend: &impl NCBackend) -> Self {
+    pub fn new(backend: &impl NCBackend, config: &Config) -> Self {
         Self {
             state: TreeState::default(),
             items: vec![
@@ -63,6 +65,8 @@ impl ChatSelector<'_> {
                 )
                 .expect("Group name duplicate"),
             ],
+            default_style: config.theme.default_style(),
+            default_highlight_style: config.theme.default_highlight_style(),
         }
     }
 
@@ -118,9 +122,139 @@ impl ChatSelector<'_> {
                     .track_symbol(None)
                     .end_symbol(None),
             ))
-            .style(get_theme().default_style())
-            .highlight_style(get_theme().default_highlight_style().bold())
+            .style(self.default_style)
+            .highlight_style(self.default_highlight_style.bold())
             .highlight_symbol(">> ");
         frame.render_stateful_widget(widget, area, &mut self.state);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::backend::nc_request::NCReqDataParticipants;
+    use crate::backend::nc_room::MockNCRoomInterface;
+    use crate::backend::nc_talk::MockNCTalk;
+    use crate::config::init;
+    use backend::TestBackend;
+    use mockall::predicate::eq;
+    use mockall::Sequence;
+
+    use super::*;
+
+    #[test]
+    fn render() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+        let mut seq = Sequence::new();
+
+        let mut mock_nc_backend = MockNCTalk::new();
+        let mut mock_room = MockNCRoomInterface::new();
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        mock_nc_backend
+            .expect_get_unread_rooms()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![]);
+
+        mock_nc_backend
+            .expect_get_dm_keys_display_name_mapping()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![]);
+
+        mock_nc_backend
+            .expect_get_group_keys_display_name_mapping()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![]);
+
+        mock_nc_backend
+            .expect_get_unread_rooms()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec!["0".to_string()]);
+
+        mock_room
+            .expect_get_display_name()
+            .once()
+            .return_const("General".to_string());
+
+        mock_nc_backend
+            .expect_get_room()
+            .with(eq("0".to_string()))
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(mock_room);
+
+        mock_nc_backend
+            .expect_get_dm_keys_display_name_mapping()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![("Butz".to_string(), "1".to_string())]);
+
+        mock_nc_backend
+            .expect_get_group_keys_display_name_mapping()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![("Bert".to_string(), "2".to_string())]);
+
+        let mut chat_selector_box = ChatSelector::new(&mock_nc_backend, &config);
+
+        let mut dummy_user = NCReqDataParticipants::default();
+        dummy_user.displayName = "Butz".to_string();
+
+        terminal
+            .draw(|frame| chat_selector_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "┌Chat Section──────────────────────────┐",
+            "│  Unread Chats                        │",
+            "│  DMs                                 │",
+            "│  Group                               │",
+            "│                                      │",
+            "│                                      │",
+            "│                                      │",
+            "│                                      │",
+            "│                                      │",
+            "└──────────────────────────────────────┘",
+        ]);
+        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+
+        terminal.backend().assert_buffer(&expected);
+
+        assert!(chat_selector_box.update(&mock_nc_backend).is_ok());
+
+        chat_selector_box.state.key_down();
+        chat_selector_box.state.key_right();
+
+        terminal
+            .draw(|frame| chat_selector_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "┌Chat Section──────────────────────────┐",
+            "│>> ▼ Unread Chats                     │",
+            "│       General                        │",
+            "│   ▶ DMs                              │",
+            "│   ▶ Group                            │",
+            "│                                      │",
+            "│                                      │",
+            "│                                      │",
+            "│                                      │",
+            "└──────────────────────────────────────┘",
+        ]);
+        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+        expected.set_style(
+            Rect::new(1, 1, 38, 1),
+            config.theme.default_highlight_style().bold(),
+        );
+
+        terminal.backend().assert_buffer(&expected);
     }
 }

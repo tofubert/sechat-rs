@@ -111,11 +111,11 @@ struct Args {
 /// Passes Backend into Frontend.
 /// Frontend runs infinite loop.
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
     let args = Args::parse();
 
-    config::init(&args.config_path).expect("Config init aborted.");
-    config::get().config_logging();
+    let config = config::init(&args.config_path)?;
+    config.config_logging();
 
     // check if crate has alpha suffix in version
     let pre = env!("CARGO_PKG_VERSION_PRE");
@@ -124,13 +124,14 @@ async fn main() {
     }
 
     // Create API Wrapper for NC Talk API.
-    let requester = backend::nc_request::NCRequest::new().expect("cannot create NCRequest");
+    let requester = backend::nc_request::NCRequest::new(&config).expect("cannot create NCRequest");
 
     // Create Backend, UI and enter UI loop.
-    match backend::nc_talk::NCTalk::new(requester).await {
-        Ok(backend) => ui::run(backend).await.expect("crashed"),
+    match backend::nc_talk::NCTalk::new(requester, &config).await {
+        Ok(backend) => ui::run(backend, &config).await.expect("crashed"),
         Err(why) => {
             log::error!("Failed to create backend because: {why}");
         }
     };
+    Ok(())
 }

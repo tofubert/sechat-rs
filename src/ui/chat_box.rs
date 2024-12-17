@@ -1,5 +1,5 @@
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
-use crate::config::get_theme;
+use crate::config::Config;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -16,15 +16,26 @@ pub struct ChatBox<'a> {
     current_index: usize,
     width: u16,
     state: TableState,
+    default_style: Style,
+    default_highlight_style: Style,
+    unread_message_style: Style,
+    table_header_style: Style,
 }
 
 impl ChatBox<'_> {
-    pub fn new() -> Self {
+    pub fn new(config: &Config) -> Self {
         ChatBox {
             messages: Vec::new(),
             current_index: 0,
             width: 10,
             state: TableState::default().with_offset(1).with_selected(0),
+            unread_message_style: config
+                .theme
+                .unread_message_style()
+                .add_modifier(Modifier::BOLD),
+            default_style: config.theme.default_style(),
+            default_highlight_style: config.theme.default_highlight_style(),
+            table_header_style: config.theme.table_header_style(),
         }
     }
 
@@ -95,13 +106,7 @@ impl ChatBox<'_> {
                 let unread_marker: Vec<Cell> = vec![
                     "".into(),
                     "".into(),
-                    Span::styled(
-                        "+++ LAST READ +++",
-                        get_theme()
-                            .unread_message_style()
-                            .add_modifier(Modifier::BOLD),
-                    )
-                    .into(),
+                    Span::styled("+++ LAST READ +++", self.unread_message_style).into(),
                 ];
                 self.messages.push(Row::new(unread_marker));
             }
@@ -161,17 +166,138 @@ impl StatefulWidget for &ChatBox<'_> {
         StatefulWidget::render(
             Table::new(self.messages.clone(), widths)
                 .column_spacing(1)
-                .style(get_theme().default_style())
-                .header(
-                    Row::new(vec!["Time", "Name", "Message"])
-                        .style(get_theme().table_header_style()),
-                )
+                .style(self.default_style)
+                .header(Row::new(vec!["Time", "Name", "Message"]).style(self.table_header_style))
                 .block(Block::default())
-                .row_highlight_style(get_theme().default_highlight_style())
+                .row_highlight_style(self.default_highlight_style)
                 .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,
             state,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::backend::nc_message::NCMessage;
+    use crate::backend::nc_request::{NCReqDataMessage, NCReqDataParticipants};
+    use crate::backend::nc_room::MockNCRoomInterface;
+    use crate::backend::nc_talk::MockNCTalk;
+    use crate::config::init;
+    use backend::TestBackend;
+    use chrono::{DateTime, Local, Utc};
+
+    use super::*;
+
+    #[test]
+    fn render() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+
+        let mut mock_nc_backend = MockNCTalk::new();
+        let mut mock_room = MockNCRoomInterface::new();
+        let timestamp_1 = DateTime::<Utc>::from_timestamp(2000, 0).unwrap();
+        let mock_message_1 = NCMessage::from(NCReqDataMessage {
+            id: 0,
+            message: "Butz".to_string(),
+            messageType: "comment".to_string(),
+            actorDisplayName: "Hundi".to_string(),
+            timestamp: timestamp_1.timestamp(),
+            ..Default::default()
+        });
+        let timestamp_2 = DateTime::<Utc>::from_timestamp(200_000, 0).unwrap();
+        let mock_message_2 = NCMessage::from(NCReqDataMessage {
+            id: 1,
+            message: "Bert".to_string(),
+            messageType: "comment".to_string(),
+            actorDisplayName: "Stinko".to_string(),
+            timestamp: timestamp_2.timestamp(),
+            ..Default::default()
+        });
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut chat_box = ChatBox::new(&config);
+
+        let mut dummy_user = NCReqDataParticipants::default();
+        dummy_user.displayName = "Butz".to_string();
+        mock_room
+            .expect_get_messages()
+            .once()
+            .return_const(vec![mock_message_1, mock_message_2]);
+        mock_room.expect_has_unread().times(2).return_const(false);
+        mock_nc_backend
+            .expect_get_current_room()
+            .times(3)
+            .return_const(mock_room);
+
+        terminal
+            .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "Time  Name                 Message      ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+        ]);
+        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+
+        expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
+
+        terminal.backend().assert_buffer(&expected);
+
+        chat_box.update_messages(&mock_nc_backend);
+
+        terminal
+            .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .unwrap();
+
+        let mut expected = Buffer::with_lines([
+            "Time  Name                 Message      ",
+            "01:33 Hundi                Butz         ",
+            "04:46 Stinko               Bert         ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+        ]);
+        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+
+        expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
+        expected.set_style(
+            Rect::new(0, 1, 40, 1),
+            config.theme.default_highlight_style(),
+        );
+        expected.set_string(
+            0,
+            1,
+            DateTime::<Local>::from(timestamp_1)
+                .format("%H:%M")
+                .to_string(),
+            config.theme.default_highlight_style(),
+        );
+        expected.set_string(
+            0,
+            2,
+            DateTime::<Local>::from(timestamp_2)
+                .format("%H:%M")
+                .to_string(),
+            config.theme.default_style(),
+        );
+
+        terminal.backend().assert_buffer(&expected);
     }
 }
