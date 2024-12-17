@@ -1,3 +1,4 @@
+//! Butz
 pub mod app;
 pub mod chat_box;
 pub mod chat_selector;
