@@ -1,3 +1,9 @@
+//! NC Talk Message Object
+//!
+//! [`NCTalk`] for the main implementation.
+//!
+//! [`NCBackend`] as the trait to enable testing.
+
 use crate::{
     backend::{
         nc_notify::NCNotify,
@@ -17,24 +23,50 @@ use std::{
 
 use super::nc_room::{NCRoom, NCRoomTypes};
 
+/// Public Trait for NC Talk Instance Object used for all interaction with the server.
+///
+/// This trait is needed due to the use of the [`mockall`] crate in testing.
+/// See [`backend::nc_talk::NCTalk`] for more details on the functionality.
 #[async_trait]
 pub trait NCBackend: Debug + Send + Default {
+    /// Trait for the NC Talk Room representation.
     type Room: NCRoomInterface;
+    /// Write all log files for this NC Instance to disk.
+    /// # Errors
+    /// Folder might not exists/be writable or not have space.
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
+    /// Get the token hash of the currently selected room.
     fn get_current_room_token(&self) -> &str;
+    /// Get a Room ref for a given Token.
     fn get_room(&self, token: &str) -> &Self::Room;
+    /// Get a ref for the currently selected room.
     fn get_current_room(&self) -> &Self::Room;
+    /// Get a list of tokens of rooms with unread messages.
     fn get_unread_rooms(&self) -> Vec<String>;
+    /// Get a room token by its Displayname.
     fn get_room_by_displayname(&self, name: &str) -> String;
+    /// Get a list of direct messages rooms as token, displayname pairs.
     fn get_dm_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+    /// Get a list of group messages rooms as token, displayname pairs.
     fn get_group_keys_display_name_mapping(&self) -> Vec<(String, String)>;
+    /// Get a list of all Room Token.
     fn get_room_keys(&self) -> Vec<&'_ String>;
+    /// Send a Message to the current selected room.
     async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>>;
+    /// Select a Room by a given Token as the current Room.
     async fn select_room(&mut self, token: String) -> Result<(), Box<dyn Error>>;
+    /// Check with the Server for all Rooms if updates happened.
+    /// ```force_update``` will force the currently stored Room data to be overwritten.
     async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
+    /// Add a new room to this Instance.
+    /// This does **not** open a new Room on the server.
     fn add_room(&mut self, room_option: Option<Self::Room>);
 }
 
+/// NC Talk instance reprensation for all interactions with Server.
+///
+/// This struct stores all Rooms in a Hashmap, holds the dbus notifyer and the API Wrapper.
+/// It also keeps track of the current room in focus. Which is needed for
 #[derive(Debug, Default)]
 pub struct NCTalk<Requester: NCRequestInterface + 'static + std::marker::Sync> {
     rooms: HashMap<String, NCRoom<Requester>>,
@@ -42,6 +74,7 @@ pub struct NCTalk<Requester: NCRequestInterface + 'static + std::marker::Sync> {
     last_requested: i64,
     requester: Requester,
     notifier: NCNotify,
+    /// Token of the currently selected Room.
     pub current_room_token: String,
 }
 
@@ -122,6 +155,16 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             NCRoom::<Requester>::new(packaged_child, requester_box, notifier, chat_log_path).await,
         )
     }
+    /// Create a new NC Talk Backend instance.
+    ///
+    /// This will first try to read the chat history from the file system.
+    /// Should this fail it will use the Requester to fetch data from Server.
+    /// # Panics
+    ///
+    /// # Errors
+    /// Initial fetching of the Rooms from the backend may fail.
+    /// Selecting a current Room might fail.
+    /// Reading data from a file might fail.
     pub async fn new(requester: Requester) -> Result<NCTalk<Requester>, Box<dyn Error>> {
         let notify = NCNotify::new();
 
@@ -141,7 +184,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
 
         if path.exists() {
             if let Ok(data) = serde_json::from_str::<HashMap<String, NCReqDataRoom>>(
-                std::fs::read_to_string(path).unwrap().as_str(),
+                std::fs::read_to_string(path)?.as_str(),
             ) {
                 NCTalk::parse_files(
                     data,

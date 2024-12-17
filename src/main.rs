@@ -88,7 +88,6 @@
 //! [Deps.rs]: https://deps.rs/repo/github/tofubert/sechat-rs
 //! [Docs Badge]: https://img.shields.io/docsrs/ratatui?logo=rust&style=flat-square&logoColor=E05D44
 
-/// NCTalk Backend Module
 mod backend;
 /// Config and Theme Module
 mod config;
