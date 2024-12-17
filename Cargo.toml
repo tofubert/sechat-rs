@@ -20,10 +20,20 @@ exclude = [
   "tags",
 ]
 
+
+
+[build-dependencies]
+cargo-make = "0.37.23"
+cargo-audit = "0.21.0"
+cargo-deny = "0.16.3"
+cargo-llvm-cov = "0.6.14"
+typos = "0.10.31"
+
 [dev-dependencies]
 mockall = { version = "0.13.1" }
 mockall_derive = { version = "0.13.1"}
 tempfile = "3.14.0"
+
 
 
 [dependencies]
@@ -35,9 +45,9 @@ jzon = "*"
 base64 = "*"
 toml = "*"
 toml-example = "0.12.0"
-ratatui = {version = "0.28", features = ["serde"] }
+ratatui = {version = "0.29.0", features = ["serde"] }
 crossterm = "*"
-tui-tree-widget = "0.22"
+tui-tree-widget = "0.23"
 futures = "*"
 chrono = "*"
 num-traits = "*"
@@ -58,9 +68,12 @@ libc = "0.2.168"
 strip-ansi-escapes = "0.2.0"
 tracing = "0.1.41"
 cfg-if = "1.0.0"
-tui-textarea = "0.6.1"
+tui-textarea = "0.7.0"
 async-trait = "0.1.83"
 serde_with = "3.11.0"
 
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
 [lints.clippy]
-pedantic = "warn"
+pedantic = "deny"

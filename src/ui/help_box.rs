@@ -65,7 +65,7 @@ impl Widget for &HelpBox {
             .style(self.default)
             .header(Row::new(vec!["Key", "Name", "Behavior"]).style(self.table_header))
             .block(Block::default())
-            .highlight_style(self.default_highlight)
+            .row_highlight_style(self.default_highlight)
             .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,

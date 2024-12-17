@@ -169,7 +169,7 @@ impl StatefulWidget for &ChatBox<'_> {
                 .style(self.default_style)
                 .header(Row::new(vec!["Time", "Name", "Message"]).style(self.table_header_style))
                 .block(Block::default())
-                .highlight_style(self.default_highlight_style)
+                .row_highlight_style(self.default_highlight_style)
                 .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,
