@@ -16,3 +16,6 @@ comment: # https://docs.codecov.com/docs/pull-request-comments
 
 github_checks:
   annotations: false #Make commit readable again.
+
+ignore:
+  - "main.rs"  #main is not testable.
