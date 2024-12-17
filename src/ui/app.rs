@@ -32,7 +32,7 @@ pub struct App<'a, Backend: NCBackend> {
     default_style: Style,
 }
 
-impl<'a, Backend: NCBackend> App<'a, Backend> {
+impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend, config: &Config) -> Self {
         Self {
             current_screen: CurrentScreen::Reading,
