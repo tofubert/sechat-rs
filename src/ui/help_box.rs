@@ -1,3 +1,4 @@
+use crate::config::get_theme;
 use ratatui::{
     prelude::*,
     widgets::{Block, HighlightSpacing, Row, Table},
@@ -20,6 +21,7 @@ impl Widget for &HelpBox {
                     Row::new(["q", "quit", "enter the quit screen."]),
                     Row::new(["o", "open", "enter the chat selection screen."]),
                     Row::new(["u", "users sidebar", "Toggle whether the users are shown in a chat sidebar. Available in reading mode."]),
+
                     Row::new(["?", "help", "enter this help screen."]),
                     Row::new([
                         "m",
@@ -49,10 +51,10 @@ impl Widget for &HelpBox {
                 ],
             )
             .column_spacing(1)
-            .style(Style::new().white().on_black())
-            .header(Row::new(vec!["Key", "Name", "Behavior"]).style(Style::new().bold().blue()))
+            .style(get_theme().default_style())
+            .header(Row::new(vec!["Key", "Name", "Behavior"]).style(get_theme().table_header_style()))
             .block(Block::default())
-            .highlight_style(Style::new().green())
+            .highlight_style(get_theme().default_highlight_style())
             .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,

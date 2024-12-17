@@ -1,6 +1,6 @@
 use crate::{
     backend::{nc_room::NCRoomInterface, nc_talk::NCBackend},
-    config,
+    config::{self, get_theme},
     ui::{
         chat_box::ChatBox, chat_selector::ChatSelector, help_box::HelpBox, input_box::InputBox,
         title_bar::TitleBar, users::Users,
@@ -70,7 +70,7 @@ impl<'a, Backend: NCBackend> App<'a, Backend> {
             f.render_widget(
                 Paragraph::new("To Quit Press 'y', to stay 'n'")
                     .alignment(Alignment::Center)
-                    .style(Style::default().bold().light_magenta()),
+                    .style(get_theme().default_style().bold()),
                 base_layout[1],
             );
         } else if self.current_screen == CurrentScreen::Helping {

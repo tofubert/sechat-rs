@@ -97,10 +97,7 @@ pub fn init() -> eyre::Result<Tui> {
     execute!(stdout(), EnterAlternateScreen)?;
     if execute!(
         stdout(),
-        PushKeyboardEnhancementFlags(
-            KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES
-                | KeyboardEnhancementFlags::REPORT_ALL_KEYS_AS_ESCAPE_CODES
-        )
+        PushKeyboardEnhancementFlags(KeyboardEnhancementFlags::DISAMBIGUATE_ESCAPE_CODES)
     )
     .is_err()
     {
@@ -210,7 +207,9 @@ async fn process_event(
             }
             _ => (),
         },
-        _ => (),
+        _ => {
+            log::debug!("Unknown Event {:?}", event);
+        }
     }
     Ok(ProcessEventResult::Continue)
 }

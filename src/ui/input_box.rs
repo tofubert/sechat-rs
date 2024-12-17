@@ -1,3 +1,4 @@
+use crate::config::get_theme;
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders},
@@ -9,10 +10,14 @@ pub struct InputBox<'a> {
     textarea: TextArea<'a>,
 }
 
-impl<'a> InputBox<'a> {
-    pub fn new(initial_message: &str) -> InputBox<'a> {
+impl InputBox<'_> {
+    pub fn new(initial_message: &str) -> Self {
         let mut textarea = TextArea::new(vec![initial_message.into()]);
-        textarea.set_block(Block::default().borders(Borders::TOP));
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::TOP)
+                .style(get_theme().default_style()),
+        );
         InputBox { textarea }
     }
 
@@ -29,7 +34,7 @@ impl<'a> std::ops::Deref for InputBox<'a> {
     }
 }
 
-impl<'a> std::ops::DerefMut for InputBox<'a> {
+impl std::ops::DerefMut for InputBox<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.textarea
     }

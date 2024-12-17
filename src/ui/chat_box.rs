@@ -1,4 +1,5 @@
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
+use crate::config::get_theme;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -17,8 +18,8 @@ pub struct ChatBox<'a> {
     state: TableState,
 }
 
-impl<'a> ChatBox<'a> {
-    pub fn new() -> ChatBox<'a> {
+impl ChatBox<'_> {
+    pub fn new() -> Self {
         ChatBox {
             messages: Vec::new(),
             current_index: 0,
@@ -96,7 +97,9 @@ impl<'a> ChatBox<'a> {
                     "".into(),
                     Span::styled(
                         "+++ LAST READ +++",
-                        Style::default().add_modifier(Modifier::BOLD),
+                        get_theme()
+                            .unread_message_style()
+                            .add_modifier(Modifier::BOLD),
                     )
                     .into(),
                 ];
@@ -146,7 +149,7 @@ impl<'a> ChatBox<'a> {
     }
 }
 
-impl<'a> StatefulWidget for &ChatBox<'a> {
+impl StatefulWidget for &ChatBox<'_> {
     type State = TableState;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         // Columns widths are constrained in the same way as Layout...
@@ -158,10 +161,13 @@ impl<'a> StatefulWidget for &ChatBox<'a> {
         StatefulWidget::render(
             Table::new(self.messages.clone(), widths)
                 .column_spacing(1)
-                .style(Style::new().white().on_black())
-                .header(Row::new(vec!["Time", "Name", "Message"]).style(Style::new().bold().blue()))
+                .style(get_theme().default_style())
+                .header(
+                    Row::new(vec!["Time", "Name", "Message"])
+                        .style(get_theme().table_header_style()),
+                )
                 .block(Block::default())
-                .highlight_style(Style::new().green())
+                .highlight_style(get_theme().default_highlight_style())
                 .highlight_spacing(HighlightSpacing::Never),
             area,
             buf,

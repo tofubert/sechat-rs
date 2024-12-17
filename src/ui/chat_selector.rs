@@ -3,7 +3,6 @@ use std::error::Error;
 use itertools::Itertools;
 use ratatui::{
     prelude::*,
-    style::{Color, Modifier, Style},
     widgets::{Block, Scrollbar, ScrollbarOrientation},
     Frame,
 };
@@ -12,13 +11,14 @@ use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::backend::nc_room::NCRoomInterface;
 use crate::backend::nc_talk::NCBackend;
+use crate::config::get_theme;
 
 pub struct ChatSelector<'a> {
     pub state: TreeState<String>,
     items: Vec<TreeItem<'a, String>>,
 }
 
-impl<'a> ChatSelector<'a> {
+impl ChatSelector<'_> {
     pub fn new(backend: &impl NCBackend) -> Self {
         Self {
             state: TreeState::default(),
@@ -118,12 +118,8 @@ impl<'a> ChatSelector<'a> {
                     .track_symbol(None)
                     .end_symbol(None),
             ))
-            .highlight_style(
-                Style::new()
-                    .fg(Color::Black)
-                    .bg(Color::LightGreen)
-                    .add_modifier(Modifier::BOLD),
-            )
+            .style(get_theme().default_style())
+            .highlight_style(get_theme().default_highlight_style().bold())
             .highlight_symbol(">> ");
         frame.render_stateful_widget(widget, area, &mut self.state);
     }

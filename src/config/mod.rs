@@ -1,18 +1,65 @@
 mod data;
+mod theme;
 
 use color_eyre::eyre::eyre;
-use data::Data;
+use data::ConfigOptions;
 use etcetera::{app_strategy::Xdg, choose_app_strategy, AppStrategy, AppStrategyArgs};
 use log::LevelFilter;
-use std::{path::PathBuf, process::exit, sync::OnceLock};
+use serde::de::DeserializeOwned;
+use std::{path::Path, path::PathBuf, process::exit, sync::OnceLock};
+use theme::{options::ColorPalette, Theme};
 use toml_example::TomlExample;
 
 static CONFIG: OnceLock<Config> = OnceLock::new();
 
 #[derive(Debug)]
 pub struct Config {
-    pub data: Data,
+    pub data: ConfigOptions,
+    pub theme: Theme,
     strategy: Xdg,
+}
+
+pub fn check_config_exists_else_create_new<T: TomlExample>(config_path: &Path) {
+    if !config_path.exists() {
+        println!(
+            "Config files doesn't exist creating default now at {}.",
+            config_path
+                .as_os_str()
+                .to_str()
+                .expect("Failed to make config path into string")
+        );
+        if !config_path
+            .parent()
+            .expect("Config Path has no parent")
+            .exists()
+        {
+            std::fs::create_dir_all(config_path.parent().expect("Config File has no Parent"))
+                .expect("Could not Create Config dir");
+        }
+        T::to_toml_example(config_path.as_os_str().to_str().unwrap()).unwrap();
+        println!("Please Update the config with sensible values!");
+        exit(0);
+    }
+}
+
+pub fn read_config_file<T: TomlExample + DeserializeOwned>(config_path: &PathBuf) -> T {
+    let data = match toml::from_str(&std::fs::read_to_string(config_path).unwrap()) {
+        Ok(good_data) => good_data,
+        Err(why) => {
+            println!("Please Update your config {why} ");
+            let example_config_path = config_path.join("_new");
+            println!(
+                "Writing example config to {}",
+                example_config_path
+                    .as_os_str()
+                    .to_str()
+                    .expect("Failed to make config path into string")
+            );
+            T::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
+            exit(-1);
+        }
+    };
+    data
 }
 
 pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
@@ -32,48 +79,19 @@ pub fn init(path_arg: &str) -> Result<(), color_eyre::eyre::Report> {
         path_arg.into()
     };
     let config_path = config_path_base.join("config.toml");
+    let theme_path = config_path_base.join("theme.toml");
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
-    if !config_path.exists() {
-        println!(
-            "Config files doesn't exist creating default now at {}.",
-            config_path
-                .as_os_str()
-                .to_str()
-                .expect("Failed to make config path into string")
-        );
-        if !config_path
-            .parent()
-            .expect("Config Path has no parent")
-            .exists()
-        {
-            std::fs::create_dir_all(config_path.parent().expect("Config File has no Parent"))
-                .expect("Could not Create Config dir");
-        }
-        Data::to_toml_example(config_path.as_os_str().to_str().unwrap()).unwrap();
-        println!("Please Update the config with sensible values!");
-        exit(0);
-    }
-    let data = match toml::from_str(&std::fs::read_to_string(config_path).unwrap()) {
-        Ok(good_data) => good_data,
-        Err(why) => {
-            println!("Please Update your config {why} ");
-            let example_config_path = config_path_base.join("config.toml_new");
-            println!(
-                "Writing example config to {}",
-                example_config_path
-                    .as_os_str()
-                    .to_str()
-                    .expect("Failed to make config path into string")
-            );
-            Data::to_toml_example(example_config_path.as_os_str().to_str().unwrap()).unwrap();
-            return Err(eyre!(why));
-        }
-    };
+    check_config_exists_else_create_new::<ConfigOptions>(&config_path);
+    check_config_exists_else_create_new::<ColorPalette>(&theme_path);
+
+    let data = read_config_file::<ConfigOptions>(&config_path);
+    let theme_data = read_config_file::<ColorPalette>(&theme_path);
 
     let mut config = Config::default();
     config.set_config_data(data);
+    config.set_theme(theme_data);
     config.set_strategy(strategy);
     CONFIG
         .set(config)
@@ -91,10 +109,15 @@ pub fn get() -> &'static Config {
     CONFIG.get().expect("config not initialized")
 }
 
+pub fn get_theme() -> &'static Theme {
+    &CONFIG.get().expect("config not initialized").theme
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
-            data: Data::default(),
+            data: ConfigOptions::default(),
+            theme: Theme::default(),
             strategy: choose_app_strategy(AppStrategyArgs {
                 top_level_domain: "org".to_string(),
                 author: "emlix".to_string(),
@@ -106,8 +129,11 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn set_config_data(&mut self, data: Data) {
+    pub fn set_config_data(&mut self, data: ConfigOptions) {
         self.data = data;
+    }
+    pub fn set_theme(&mut self, data: ColorPalette) {
+        self.theme.set_theme(data);
     }
     pub fn set_strategy(&mut self, strategy: Xdg) {
         self.strategy = strategy;
@@ -196,13 +222,11 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+    use ratatui::style::Color;
+    use ratatui::style::Style;
+
     use super::*;
 
-    #[test]
-    #[should_panic(expected = "config not initialized")]
-    fn get_config_before_init() {
-        get();
-    }
     #[test]
     #[should_panic(
         expected = "Could not Create Config dir: Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }"
@@ -226,6 +250,17 @@ mod tests {
         assert!(get().get_enable_mouse());
         assert!(get().get_enable_paste());
     }
+
+    #[test]
+    fn default_theme() {
+        // since we cant control the order of the tests we cannot be sure that this returns suchess.
+        let _ = init("./test/");
+        assert_eq!(
+            get_theme().default_style(),
+            Style::new().fg(Color::White).bg(Color::Black)
+        );
+    }
+
     #[test]
     fn init_logging() {
         let conf = Config::default();
@@ -235,7 +270,7 @@ mod tests {
     #[test]
     fn update_data() {
         let mut conf = Config::default();
-        conf.set_config_data(Data::default());
+        conf.set_config_data(ConfigOptions::default());
         conf.set_strategy(
             choose_app_strategy(AppStrategyArgs {
                 top_level_domain: "org".to_string(),

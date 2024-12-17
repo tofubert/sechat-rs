@@ -1,4 +1,5 @@
 use itertools::Itertools;
+
 use ratatui::{
     prelude::*,
     widgets::{Block, Borders, Cell, HighlightSpacing, Row, Table, TableState},
@@ -6,20 +7,21 @@ use ratatui::{
 use style::Styled;
 
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
+use crate::config;
 
 pub struct Users<'a> {
     user_list: Vec<Row<'a>>,
     state: TableState,
 }
 
-impl<'a> Default for Users<'a> {
+impl Default for Users<'_> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a> Users<'a> {
-    pub fn new() -> Users<'a> {
+impl Users<'_> {
+    pub fn new() -> Self {
         Users {
             user_list: vec![],
             state: TableState::default().with_offset(0).with_selected(0),
@@ -38,17 +40,18 @@ impl<'a> Users<'a> {
                 Row::new([{
                     if let Some(status) = &user.status {
                         Cell::new(user.displayName.to_string()).set_style(match status.as_str() {
-                            "away" => Style::new().blue(),
-                            "offline" => Style::new().gray(),
-                            "dnd" => Style::new().red(),
-                            "online" => Style::new().green(),
+                            "away" => config::get_theme().user_away_style(),
+                            "offline" => config::get_theme().user_offline_style(),
+                            "dnd" => config::get_theme().user_dnd_style(),
+                            "online" => config::get_theme().user_online_style(),
                             unknown => {
                                 log::debug!("Unknown Status {unknown}");
-                                Style::new()
+                                config::get_theme().default_style()
                             }
                         })
                     } else {
                         Cell::new(user.displayName.to_string())
+                            .style(config::get_theme().default_style())
                     }
                 }])
             })
@@ -58,14 +61,14 @@ impl<'a> Users<'a> {
     }
 }
 
-impl<'a> StatefulWidget for &Users<'a> {
+impl StatefulWidget for &Users<'_> {
     type State = TableState;
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         StatefulWidget::render(
             Table::new(self.user_list.clone(), [Constraint::Percentage(100)])
                 .column_spacing(1)
-                .style(Style::new().white().on_black())
-                .header(Row::new(vec!["Users"]).style(Style::new().bold().green()))
+                .style(config::get_theme().default_style())
+                .header(Row::new(vec!["Users"]).style(config::get_theme().table_header_style()))
                 .block(Block::default())
                 .highlight_style(Style::new().bold())
                 .highlight_spacing(HighlightSpacing::Never)
@@ -80,15 +83,19 @@ impl<'a> StatefulWidget for &Users<'a> {
 
 #[cfg(test)]
 mod tests {
+
     use crate::backend::{
         nc_request::NCReqDataParticipants, nc_room::MockNCRoomInterface, nc_talk::MockNCTalk,
     };
     use backend::TestBackend;
+    use config::init;
 
     use super::*;
 
     #[test]
     fn render_users() {
+        let _ = init("./test/");
+
         let mut mock_nc_backend = MockNCTalk::new();
         let backend = TestBackend::new(10, 10);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -120,13 +127,16 @@ mod tests {
             "          ",
             "          ",
         ]);
-        expected.set_style(Rect::new(0, 0, 8, 8), Style::new().white().on_black());
+        expected.set_style(Rect::new(0, 0, 8, 8), config::get_theme().default_style());
 
+        // header
         for x in 1..=7 {
-            expected[(x, 0)].set_style(Style::new().green().on_black().bold());
+            expected[(x, 0)].set_style(config::get_theme().table_header_style());
         }
+
+        // selected user
         for x in 1..=7 {
-            expected[(x, 1)].set_style(Style::new().white().on_black().bold());
+            expected[(x, 1)].set_style(config::get_theme().default_style().bold());
         }
 
         terminal.backend().assert_buffer(&expected);
