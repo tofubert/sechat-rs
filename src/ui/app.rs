@@ -26,6 +26,8 @@ use crossterm::event::{
 };
 use tui_textarea::Key;
 
+use super::notifications::NotifyWrapper;
+
 enum ProcessEventResult {
     Continue,
     Exit,
@@ -52,11 +54,14 @@ pub struct App<'a, Backend: NCBackend> {
     user_sidebar_visible: bool,
     default_style: Style,
     current_room_token: Token,
+    notify: NotifyWrapper,
 }
 
 impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend, config: &Config) -> Self {
         let init_room = backend.get_room_by_displayname(config.data.ui.default_room.as_str());
+        let notify = NotifyWrapper::new(config);
+
         Self {
             current_screen: CurrentScreen::Reading,
             title: TitleBar::new(CurrentScreen::Reading, init_room.clone(), config),
@@ -78,6 +83,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             user_sidebar_visible: config.data.ui.user_sidebar_default,
             default_style: config.theme.default_style(),
             current_room_token: init_room,
+            notify,
         }
     }
 
@@ -150,7 +156,8 @@ impl<Backend: NCBackend> App<'_, Backend> {
         self.backend
             .mark_current_room_as_read(&self.current_room_token)
             .await?;
-        self.backend.update_rooms(true).await?;
+        self.notify
+            .maybe_notify_new_rooms(self.backend.update_rooms(true).await?)?;
         self.update_ui()?;
         Ok(())
     }
@@ -169,9 +176,11 @@ impl<Backend: NCBackend> App<'_, Backend> {
         if self.input.is_empty() {
             Ok(())
         } else {
-            self.backend
-                .send_message(self.input.lines().join("\n"), &self.current_room_token)
-                .await?;
+            self.notify.maybe_notify_new_message(
+                self.backend
+                    .send_message(self.input.lines().join("\n"), &self.current_room_token)
+                    .await?,
+            )?;
             self.input.select_all();
             self.input.cut();
             self.input.select_all();
@@ -190,7 +199,9 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     .last()
                     .expect("no selection available"),
             );
-            self.backend.select_room(&self.current_room_token).await?;
+            self.notify.maybe_notify_new_message(
+                self.backend.select_room(&self.current_room_token).await?,
+            )?;
             self.current_screen = CurrentScreen::Reading;
             self.update_ui()?;
             self.chat.select_last_message();

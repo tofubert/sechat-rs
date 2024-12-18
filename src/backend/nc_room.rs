@@ -1,6 +1,5 @@
 use super::{
     nc_message::NCMessage,
-    nc_notify::NCNotify,
     nc_request::{
         NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequestInterface, Token,
     },
@@ -60,7 +59,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
         &mut self,
         data_option: Option<NCReqDataRoom>,
         requester: &Requester,
-    ) -> Result<(), Box<dyn std::error::Error>>;
+    ) -> Result<Option<(String, usize)>, Box<dyn std::error::Error>>;
     async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
         requester: &Requester,
@@ -69,7 +68,6 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
 
 #[derive(Debug, Default)]
 pub struct NCRoom {
-    notifier: NCNotify,
     pub messages: Vec<NCMessage>,
     room_data: NCReqDataRoom,
     path_to_log: std::path::PathBuf,
@@ -81,7 +79,6 @@ impl NCRoom {
     pub async fn new<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         room_data: NCReqDataRoom,
         requester: Requester,
-        notifier: NCNotify,
         path_to_log: std::path::PathBuf,
     ) -> Option<NCRoom> {
         let mut tmp_path_buf = path_to_log.clone();
@@ -116,7 +113,6 @@ impl NCRoom {
             .expect("Failed to fetch room participants");
 
         Some(NCRoom {
-            notifier,
             messages,
             path_to_log: tmp_path_buf,
             room_type: FromPrimitive::from_i32(room_data.roomtype).unwrap(),
@@ -257,7 +253,7 @@ impl NCRoomInterface for NCRoom {
         &mut self,
         data_option: Option<NCReqDataRoom>,
         requester: &Requester,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<Option<(String, usize)>, Box<dyn std::error::Error>> {
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
@@ -269,11 +265,11 @@ impl NCRoomInterface for NCRoom {
             )
             .await
             .unwrap();
-        if self.has_unread() && !response.is_empty() {
-            self.notifier
-                .unread_message(&self.room_data.displayName, response.len())?;
-        }
-        if !response.is_empty() {
+
+        let is_empty = response.is_empty();
+        let update_info = Some((self.room_data.displayName.clone(), response.len()));
+
+        if !is_empty {
             log::debug!(
                 "Updating {} adding {} new Messages",
                 self.to_string(),
@@ -287,8 +283,11 @@ impl NCRoomInterface for NCRoom {
             .fetch_participants(&self.room_data.token)
             .await
             .expect("Failed to fetch room participants");
-
-        Ok(())
+        if self.has_unread() && !is_empty {
+            Ok(update_info)
+        } else {
+            Ok(None)
+        }
     }
     async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
