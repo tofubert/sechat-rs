@@ -1,5 +1,5 @@
 use crate::{
-    backend::{nc_room::NCRoomInterface, nc_talk::NCBackend},
+    backend::{nc_request::Token, nc_room::NCRoomInterface, nc_talk::NCBackend},
     config::Config,
     ui::{
         chat_box::ChatBox,
@@ -51,34 +51,33 @@ pub struct App<'a, Backend: NCBackend> {
     users: Users<'a>,
     user_sidebar_visible: bool,
     default_style: Style,
+    current_room_token: Token,
 }
 
 impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend, config: &Config) -> Self {
+        let init_room = backend.get_room_by_displayname(config.data.ui.default_room.as_str());
         Self {
             current_screen: CurrentScreen::Reading,
-            title: TitleBar::new(
-                CurrentScreen::Reading,
-                backend.get_current_room().to_string(),
-                config,
-            ),
+            title: TitleBar::new(CurrentScreen::Reading, init_room.clone(), config),
             selector: ChatSelector::new(&backend, config),
             input: InputBox::new("", config),
             chat: {
                 let mut chat = ChatBox::new(config);
-                chat.update_messages(&backend);
+                chat.update_messages(&backend, &init_room);
                 chat.select_last_message();
                 chat
             },
             users: {
                 let mut users = Users::new(config);
-                users.update(&backend);
+                users.update(&backend, &init_room);
                 users
             },
             backend,
             help: HelpBox::new(config),
             user_sidebar_visible: config.data.ui.user_sidebar_default,
             default_style: config.theme.default_style(),
+            current_room_token: init_room,
         }
     }
 
@@ -117,39 +116,52 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 .constraints([Constraint::Min(4), Constraint::Length(3)])
                 .split(base_layout[1]);
 
-            if self.user_sidebar_visible && self.backend.get_current_room().is_group() {
+            if self.user_sidebar_visible
+                && self.backend.get_room(&self.current_room_token).is_group()
+            {
                 let chat_layout = Layout::default()
                     .direction(Direction::Horizontal)
                     .constraints([Constraint::Percentage(80), Constraint::Percentage(20)])
                     .split(main_layout[0]);
-                self.chat
-                    .set_width_and_update_if_change(chat_layout[0].width, &self.backend);
+                self.chat.set_width_and_update_if_change(
+                    chat_layout[0].width,
+                    &self.backend,
+                    &self.current_room_token,
+                );
                 self.chat.render_area(f, chat_layout[0]);
                 self.users.render_area(f, chat_layout[1]);
             } else {
-                self.chat
-                    .set_width_and_update_if_change(main_layout[0].width, &self.backend);
+                self.chat.set_width_and_update_if_change(
+                    main_layout[0].width,
+                    &self.backend,
+                    &self.current_room_token,
+                );
                 self.chat.render_area(f, main_layout[0]);
             };
 
             self.input.render_area(f, main_layout[1]);
         }
-        self.title.update(self.current_screen, &self.backend);
+        self.title
+            .update(self.current_screen, &self.backend, &self.current_room_token);
         self.title.render_area(f, base_layout[0]);
     }
 
     pub async fn mark_current_as_read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.backend.mark_current_room_as_read().await?;
+        self.backend
+            .mark_current_room_as_read(&self.current_room_token)
+            .await?;
         self.backend.update_rooms(true).await?;
         self.update_ui()?;
         Ok(())
     }
 
     fn update_ui(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.title.update(self.current_screen, &self.backend);
+        self.title
+            .update(self.current_screen, &self.backend, &self.current_room_token);
         self.selector.update(&self.backend)?;
-        self.chat.update_messages(&self.backend);
-        self.users.update(&self.backend);
+        self.chat
+            .update_messages(&self.backend, &self.current_room_token);
+        self.users.update(&self.backend, &self.current_room_token);
         Ok(())
     }
 
@@ -158,7 +170,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             Ok(())
         } else {
             self.backend
-                .send_message(self.input.lines().join("\n"))
+                .send_message(self.input.lines().join("\n"), &self.current_room_token)
                 .await?;
             self.input.select_all();
             self.input.cut();
@@ -171,16 +183,14 @@ impl<Backend: NCBackend> App<'_, Backend> {
 
     pub async fn select_room(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.selector.state.selected().len() == 2 {
-            self.backend
-                .select_room(
-                    self.selector
-                        .state
-                        .selected()
-                        .last()
-                        .expect("no selection available")
-                        .into(),
-                )
-                .await?;
+            self.current_room_token.clone_from(
+                self.selector
+                    .state
+                    .selected()
+                    .last()
+                    .expect("no selection available"),
+            );
+            self.backend.select_room(&self.current_room_token).await?;
             self.current_screen = CurrentScreen::Reading;
             self.update_ui()?;
             self.chat.select_last_message();

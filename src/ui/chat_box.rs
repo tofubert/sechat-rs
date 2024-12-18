@@ -1,3 +1,4 @@
+use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
 use ratatui::{
@@ -39,21 +40,26 @@ impl ChatBox<'_> {
         }
     }
 
-    pub fn set_width_and_update_if_change(&mut self, width: u16, backend: &impl NCBackend) {
+    pub fn set_width_and_update_if_change(
+        &mut self,
+        width: u16,
+        backend: &impl NCBackend,
+        current_room: &Token,
+    ) {
         let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
-            self.update_messages(backend);
+            self.update_messages(backend, current_room);
         }
     }
 
-    pub fn update_messages(&mut self, backend: &impl NCBackend) {
+    pub fn update_messages(&mut self, backend: &impl NCBackend, current_room: &Token) {
         use itertools::Itertools;
         use std::convert::TryInto;
 
         self.messages.clear();
         for message_data in backend
-            .get_current_room()
+            .get_room(current_room)
             .get_messages()
             .iter()
             .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
@@ -100,8 +106,8 @@ impl ChatBox<'_> {
                 ];
                 self.messages.push(Row::new(reaction));
             }
-            if backend.get_current_room().has_unread()
-                && backend.get_current_room().get_last_read() == message_data.get_id()
+            if backend.get_room(current_room).has_unread()
+                && backend.get_room(current_room).get_last_read() == message_data.get_id()
             {
                 let unread_marker: Vec<Cell> = vec![
                     "".into(),
@@ -230,7 +236,7 @@ mod tests {
             .return_const(vec![mock_message_1, mock_message_2]);
         mock_room.expect_has_unread().times(2).return_const(false);
         mock_nc_backend
-            .expect_get_current_room()
+            .expect_get_room()
             .times(3)
             .return_const(mock_room);
 
@@ -256,7 +262,7 @@ mod tests {
 
         terminal.backend().assert_buffer(&expected);
 
-        chat_box.update_messages(&mock_nc_backend);
+        chat_box.update_messages(&mock_nc_backend, &"123".to_string());
 
         terminal
             .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))

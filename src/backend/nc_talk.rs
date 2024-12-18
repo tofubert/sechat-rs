@@ -24,18 +24,19 @@ use super::{
 pub trait NCBackend: Debug + Send + Default {
     type Room: NCRoomInterface;
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
-    fn get_current_room_token(&self) -> &Token;
-    fn get_current_room(&self) -> &Self::Room;
     fn get_room(&self, token: &Token) -> &Self::Room;
     fn get_unread_rooms(&self) -> Vec<Token>;
     fn get_room_by_displayname(&self, name: &str) -> Token;
     fn get_dm_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
     fn get_group_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
     fn get_room_keys(&self) -> Vec<&'_ Token>;
-    async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>>;
-    async fn select_room(&mut self, token: Token) -> Result<(), Box<dyn Error>>;
+    async fn send_message(&mut self, message: String, token: &Token) -> Result<(), Box<dyn Error>>;
+    async fn select_room(&mut self, token: &Token) -> Result<(), Box<dyn Error>>;
     async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
-    async fn mark_current_room_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn mark_current_room_as_read(
+        &self,
+        token: &Token,
+    ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Debug, Default)]
@@ -45,7 +46,6 @@ pub struct NCTalk<Requester: NCRequestInterface + 'static + std::marker::Sync> {
     last_requested: i64,
     requester: Requester,
     notifier: NCNotify,
-    pub current_room_token: Token,
 }
 
 impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Requester> {
@@ -214,12 +214,11 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             rooms,
             chat_data_path: chat_log_path.clone(),
             last_requested,
-            current_room_token: Token::default(),
             requester,
             notifier: notify,
         };
         log::info!("Entering default room {}", config.data.ui.default_room);
-        talk.select_room(talk.get_room_by_displayname(&Token::from(&config.data.ui.default_room)))
+        talk.select_room(&talk.get_room_by_displayname(&Token::from(&config.data.ui.default_room)))
             .await?;
 
         log::debug!("Found {} Rooms", talk.rooms.len());
@@ -274,18 +273,10 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         }
     }
 
-    fn get_current_room_token(&self) -> &Token {
-        &self.current_room_token
-    }
-
-    fn get_current_room(&self) -> &Self::Room {
-        &self.rooms[&self.current_room_token]
-    }
-
     fn get_unread_rooms(&self) -> Vec<Token> {
         self.rooms
             .values()
-            .filter(|room| room.has_unread() && self.current_room_token != room.to_token())
+            .filter(|room| room.has_unread())
             .sorted_by(std::cmp::Ord::cmp)
             .map(NCRoomInterface::to_token)
             .collect::<Vec<Token>>()
@@ -334,24 +325,23 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         self.rooms.keys().collect::<Vec<&Token>>()
     }
 
-    async fn send_message(&mut self, message: String) -> Result<(), Box<dyn Error>> {
+    async fn send_message(&mut self, message: String, token: &Token) -> Result<(), Box<dyn Error>> {
         self.rooms
-            .get(&self.current_room_token)
+            .get(token)
             .ok_or("Room not found when it should be there")?
             .send::<Requester>(message, &self.requester)
             .await?;
         self.rooms
-            .get_mut(&self.current_room_token)
+            .get_mut(token)
             .ok_or("Room not found when it should be there")?
             .update::<Requester>(None, &self.requester)
             .await
     }
 
-    async fn select_room(&mut self, token: Token) -> Result<(), Box<dyn Error>> {
-        self.current_room_token.clone_from(&token);
+    async fn select_room(&mut self, token: &Token) -> Result<(), Box<dyn Error>> {
         log::debug!("key {}", token);
         self.rooms
-            .get_mut(&self.current_room_token)
+            .get_mut(token)
             .ok_or_else(|| format!("Failed to get Room ref for room selection: {token}."))?
             .update::<Requester>(None, &self.requester)
             .await
@@ -403,8 +393,11 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         Ok(())
     }
 
-    async fn mark_current_room_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
-        self.get_current_room().mark_as_read(&self.requester).await
+    async fn mark_current_room_as_read(
+        &self,
+        token: &Token,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.rooms[token].mark_as_read(&self.requester).await
     }
     fn get_room(&self, token: &Token) -> &Self::Room {
         &self.rooms[token]
@@ -425,18 +418,16 @@ mock! {
     impl NCBackend for NCTalk{
         type Room = MockNCRoomInterface;
         fn write_to_log(&mut self) -> Result<(), std::io::Error>;
-        fn get_current_room_token(&self) -> &Token;
         fn get_room(&self, token: &Token) -> &<MockNCTalk as NCBackend>::Room;
-        fn get_current_room(&self) -> &<MockNCTalk as NCBackend>::Room;
         fn get_unread_rooms(&self) -> Vec<Token>;
         fn get_room_by_displayname(&self, name: &str) -> Token;
         fn get_dm_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
         fn get_group_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
         fn get_room_keys<'a>(&'a self) -> Vec<&'a Token>;
-        async fn send_message(& mut self, message: String) -> Result<(), Box<dyn Error>>;
-        async fn select_room(&mut self, token: Token) -> Result<(), Box<dyn Error>>;
+        async fn send_message(& mut self, message: String, token: &Token) -> Result<(), Box<dyn Error>>;
+        async fn select_room(&mut self, token: &Token) -> Result<(), Box<dyn Error>>;
         async fn update_rooms(& mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
-        async fn mark_current_room_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
+        async fn mark_current_room_as_read(&self, token: &Token) -> Result<(), Box<dyn std::error::Error>>;
     }
 }
 
@@ -566,11 +557,6 @@ mod tests {
             id: 3,
             ..Default::default()
         };
-        let post_room_switch_message = NCReqDataMessage {
-            messageType: "comment".to_string(),
-            id: 3,
-            ..Default::default()
-        };
 
         let mut seq = Sequence::new();
 
@@ -587,7 +573,7 @@ mod tests {
             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
         mock_requester
             .expect_fetch_participants()
-            .times(3)
+            .times(2)
             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
         mock_requester
             .expect_fetch_chat_update()
@@ -608,12 +594,6 @@ mod tests {
             .with(eq(Token::from("123")), eq(200), eq(2))
             .in_sequence(&mut seq)
             .return_once_st(move |_, _, _| Ok(vec![post_send_message.clone()]));
-        mock_requester
-            .expect_fetch_chat_update()
-            .with(eq(Token::from("123")), eq(200), eq(3))
-            .once()
-            .in_sequence(&mut seq)
-            .return_once_st(move |_, _, _| Ok(vec![post_room_switch_message.clone()]));
 
         mock_requester_file
             .expect_clone()
@@ -635,18 +615,17 @@ mod tests {
     }
 
     async fn check_results(mut backend: NCTalk<MockNCRequest>) {
-        assert!(backend.send_message("Test".to_owned()).await.is_ok());
-
-        assert!(backend.select_room("123".into()).await.is_ok());
+        assert!(backend
+            .send_message("Test".to_owned(), &Token::from("123"))
+            .await
+            .is_ok());
 
         assert!(backend.update_rooms(false).await.is_ok());
 
-        assert_eq!(backend.get_current_room_token(), &Token::from("123"));
         assert_eq!(
             backend.get_room(&"123".into()).to_token(),
             Token::from("123")
         );
-        assert_eq!(backend.get_current_room().to_token(), Token::from("123"));
         assert_eq!(backend.get_unread_rooms().len(), 0);
         assert_eq!(
             backend.get_room_by_displayname("General"),
