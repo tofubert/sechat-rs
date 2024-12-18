@@ -25,8 +25,8 @@ pub trait NCBackend: Debug + Send + Default {
     type Room: NCRoomInterface;
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
     fn get_current_room_token(&self) -> &Token;
-    fn get_room(&self, token: &Token) -> &Self::Room;
     fn get_current_room(&self) -> &Self::Room;
+    fn get_room(&self, token: &Token) -> &Self::Room;
     fn get_unread_rooms(&self) -> Vec<Token>;
     fn get_room_by_displayname(&self, name: &str) -> Token;
     fn get_dm_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
@@ -36,7 +36,6 @@ pub trait NCBackend: Debug + Send + Default {
     async fn select_room(&mut self, token: Token) -> Result<(), Box<dyn Error>>;
     async fn update_rooms(&mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
     async fn mark_current_room_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
-    fn add_room(&mut self, room_option: Option<Self::Room>);
 }
 
 #[derive(Debug, Default)]
@@ -283,10 +282,6 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         &self.rooms[&self.current_room_token]
     }
 
-    fn get_room(&self, token: &Token) -> &Self::Room {
-        &self.rooms[token]
-    }
-
     fn get_unread_rooms(&self) -> Vec<Token> {
         self.rooms
             .values()
@@ -392,14 +387,16 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
                 }
             } else {
                 self.notifier.new_room(&room.displayName)?;
-                self.add_room(
+                self.rooms.insert(
+                    room.token.clone(),
                     NCRoom::new(
                         room,
                         self.requester.clone(),
                         self.notifier.clone(),
                         self.chat_data_path.clone(),
                     )
-                    .await,
+                    .await
+                    .expect("Could not Create Room."),
                 );
             }
         }
@@ -409,11 +406,8 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
     async fn mark_current_room_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
         self.get_current_room().mark_as_read(&self.requester).await
     }
-
-    fn add_room(&mut self, room_option: Option<Self::Room>) {
-        if let Some(room) = room_option {
-            self.rooms.insert(room.to_token(), room);
-        }
+    fn get_room(&self, token: &Token) -> &Self::Room {
+        &self.rooms[token]
     }
 }
 
@@ -443,7 +437,6 @@ mock! {
         async fn select_room(&mut self, token: Token) -> Result<(), Box<dyn Error>>;
         async fn update_rooms(& mut self, force_update: bool) -> Result<(), Box<dyn Error>>;
         async fn mark_current_room_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
-        fn add_room(&mut self, room_option: Option<<MockNCTalk as NCBackend>::Room>);
     }
 }
 
