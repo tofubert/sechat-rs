@@ -1,7 +1,9 @@
 use super::{
     nc_message::NCMessage,
     nc_notify::NCNotify,
-    nc_request::{NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequestInterface},
+    nc_request::{
+        NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequestInterface, Token,
+    },
 };
 use async_trait::async_trait;
 use log;
@@ -42,23 +44,31 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     fn to_json(&self) -> String;
     fn to_data(&self) -> NCReqDataRoom;
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
-    fn to_token(&self) -> String;
-    async fn update_if_id_is_newer(
+    fn to_token(&self) -> Token;
+    async fn update_if_id_is_newer<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         message_id: i32,
         data_option: Option<NCReqDataRoom>,
+        requester: &Requester,
     ) -> Result<(), Box<dyn std::error::Error>>;
-    async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>>;
-    async fn update(
+    async fn send<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &self,
+        message: String,
+        requester: &Requester,
+    ) -> Result<String, Box<dyn std::error::Error>>;
+    async fn update<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         data_option: Option<NCReqDataRoom>,
+        requester: &Requester,
     ) -> Result<(), Box<dyn std::error::Error>>;
-    async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
+    async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &self,
+        requester: &Requester,
+    ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 #[derive(Debug, Default)]
-pub struct NCRoom<Requester: NCRequestInterface + 'static + std::marker::Sync> {
-    requester: Requester,
+pub struct NCRoom {
     notifier: NCNotify,
     pub messages: Vec<NCMessage>,
     room_data: NCReqDataRoom,
@@ -67,13 +77,13 @@ pub struct NCRoom<Requester: NCRequestInterface + 'static + std::marker::Sync> {
     participants: Vec<NCReqDataParticipants>,
 }
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Requester> {
-    pub async fn new(
+impl NCRoom {
+    pub async fn new<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         room_data: NCReqDataRoom,
         requester: Requester,
         notifier: NCNotify,
         path_to_log: std::path::PathBuf,
-    ) -> Option<NCRoom<Requester>> {
+    ) -> Option<NCRoom> {
         let mut tmp_path_buf = path_to_log.clone();
         tmp_path_buf.push(room_data.token.as_str());
         let path = tmp_path_buf.as_path();
@@ -90,13 +100,13 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
                     "Failed to parse json for {}, falling back to fetching",
                     room_data.displayName
                 );
-                NCRoom::<Requester>::fetch_messages(&requester, &room_data.token, &mut messages)
+                NCRoom::fetch_messages::<Requester>(&requester, &room_data.token, &mut messages)
                     .await
                     .ok();
             }
         } else {
             log::debug!("No Log File found for room {}", room_data.displayName);
-            NCRoom::<Requester>::fetch_messages(&requester, &room_data.token, &mut messages)
+            NCRoom::fetch_messages::<Requester>(&requester, &room_data.token, &mut messages)
                 .await
                 .ok();
         }
@@ -106,7 +116,6 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
             .expect("Failed to fetch room participants");
 
         Some(NCRoom {
-            requester,
             notifier,
             messages,
             path_to_log: tmp_path_buf,
@@ -115,9 +124,9 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
             room_data,
         })
     }
-    async fn fetch_messages(
+    async fn fetch_messages<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         requester: &Requester,
-        token: &str,
+        token: &Token,
         messages: &mut Vec<NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let response = requester.fetch_chat_initial(token, 200).await?;
@@ -129,9 +138,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoom<Request
 }
 
 #[async_trait]
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterface
-    for NCRoom<Requester>
-{
+impl NCRoomInterface for NCRoom {
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
@@ -229,33 +236,34 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
         }
     }
 
-    fn to_token(&self) -> String {
+    fn to_token(&self) -> Token {
         self.room_data.token.clone()
     }
 
-    async fn send(&self, message: String) -> Result<String, Box<dyn std::error::Error>> {
+    async fn send<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &self,
+        message: String,
+        requester: &Requester,
+    ) -> Result<String, Box<dyn std::error::Error>> {
         log::debug!("Send Message {}", &message);
-        let response = self
-            .requester
-            .send_message(message, self.room_data.token.as_str())
-            .await;
+        let response = requester.send_message(message, &self.room_data.token).await;
         match response {
             Ok(v) => Ok(v.message),
             Err(v) => Err(v),
         }
     }
 
-    async fn update(
+    async fn update<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         data_option: Option<NCReqDataRoom>,
+        requester: &Requester,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
-        let response = self
-            .requester
+        let response = requester
             .fetch_chat_update(
-                self.room_data.token.as_str(),
+                &self.room_data.token,
                 200,
                 self.messages.last().unwrap().get_id(),
             )
@@ -275,17 +283,19 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
         for message in response {
             self.messages.push(message.into());
         }
-        self.participants = self
-            .requester
+        self.participants = requester
             .fetch_participants(&self.room_data.token)
             .await
             .expect("Failed to fetch room participants");
 
         Ok(())
     }
-    async fn mark_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &self,
+        requester: &Requester,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
-            self.requester
+            requester
                 .mark_chat_read(
                     &self.room_data.token,
                     self.messages.last().ok_or("No last message")?.get_id(),
@@ -294,10 +304,11 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
         }
         Ok(())
     }
-    async fn update_if_id_is_newer(
+    async fn update_if_id_is_newer<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         message_id: i32,
         data_option: Option<NCReqDataRoom>,
+        requester: &Requester,
     ) -> Result<(), Box<dyn std::error::Error>> {
         use std::cmp::Ordering;
 
@@ -310,7 +321,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
                         last_internal_id,
                         message_id
                     );
-                    self.update(data_option).await?;
+                    self.update(data_option, requester).await?;
                 }
                 Ordering::Less => {
                     log::warn!(
@@ -327,37 +338,33 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCRoomInterfac
     }
 }
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> Ord for NCRoom<Requester> {
+impl Ord for NCRoom {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.to_string().cmp(other)
     }
 }
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> PartialOrd for NCRoom<Requester> {
+impl PartialOrd for NCRoom {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> PartialEq for NCRoom<Requester> {
+impl PartialEq for NCRoom {
     fn eq(&self, other: &Self) -> bool {
         self.as_str() == other.as_str()
     }
 }
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> Eq for NCRoom<Requester> {}
+impl Eq for NCRoom {}
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> std::fmt::Display
-    for NCRoom<Requester>
-{
+impl std::fmt::Display for NCRoom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
 
-impl<Requester: NCRequestInterface + 'static + std::marker::Sync> std::ops::Deref
-    for NCRoom<Requester>
-{
+impl std::ops::Deref for NCRoom {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {

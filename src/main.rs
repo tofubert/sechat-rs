@@ -28,12 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let requester = backend::nc_request::NCRequest::new(&config).expect("cannot create NCRequest");
 
-    let backend = match backend::nc_talk::NCTalk::new(requester, &config).await {
-        Ok(backend) => backend,
-        Err(why) => {
-            panic!("Failed to create backend because: {}", why);
-        }
-    };
+    let backend = backend::nc_talk::NCTalk::new(requester, &config).await?;
     let mut ui: ui::app::App<'_, _> = ui::app::App::new(backend, &config);
 
     ui.run(&config).await

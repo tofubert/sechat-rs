@@ -139,7 +139,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
     }
 
     pub async fn mark_current_as_read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.backend.get_current_room().mark_as_read().await?;
+        self.backend.mark_current_room_as_read().await?;
         self.backend.update_rooms(true).await?;
         self.update_ui()?;
         Ok(())
@@ -178,7 +178,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                         .selected()
                         .last()
                         .expect("no selection available")
-                        .clone(),
+                        .into(),
                 )
                 .await?;
             self.current_screen = CurrentScreen::Reading;

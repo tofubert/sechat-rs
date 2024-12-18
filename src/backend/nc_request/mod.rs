@@ -27,12 +27,14 @@ use std::{collections::HashMap, error::Error};
 #[cfg(test)]
 use mockall::{mock, predicate::*};
 
+pub type Token = String;
+
 #[async_trait]
 pub trait NCRequestInterface: Debug + Send + Clone + Default + Send + Sync {
     async fn send_message(
         &self,
         message: String,
-        token: &str,
+        token: &Token,
     ) -> Result<NCReqDataMessage, Box<dyn Error>>;
     async fn fetch_autocomplete_users(
         &self,
@@ -40,7 +42,7 @@ pub trait NCRequestInterface: Debug + Send + Clone + Default + Send + Sync {
     ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>>;
     async fn fetch_participants(
         &self,
-        token: &str,
+        token: &Token,
     ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>>;
     async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
     async fn fetch_rooms_update(
@@ -49,12 +51,12 @@ pub trait NCRequestInterface: Debug + Send + Clone + Default + Send + Sync {
     ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
     async fn fetch_chat_initial(
         &self,
-        token: &str,
+        token: &Token,
         maxMessage: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
     async fn fetch_chat_update(
         &self,
-        token: &str,
+        token: &Token,
         maxMessage: i32,
         last_message: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
@@ -242,7 +244,7 @@ impl NCRequestInterface for NCRequest {
     async fn send_message(
         &self,
         message: String,
-        token: &str,
+        token: &Token,
     ) -> Result<NCReqDataMessage, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
         let params = HashMap::from([("message", message)]);
@@ -296,7 +298,7 @@ impl NCRequestInterface for NCRequest {
 
     async fn fetch_participants(
         &self,
-        token: &str,
+        token: &Token,
     ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>> {
         let url_string = self.base_url.clone()
             + "/ocs/v2.php/apps/spreed/api/v4/room/"
@@ -340,7 +342,7 @@ impl NCRequestInterface for NCRequest {
 
     async fn fetch_chat_initial(
         &self,
-        token: &str,
+        token: &Token,
         maxMessage: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
         let response_result = self.request_chat(token, maxMessage, None).await;
@@ -357,7 +359,7 @@ impl NCRequestInterface for NCRequest {
 
     async fn fetch_chat_update(
         &self,
-        token: &str,
+        token: &Token,
         maxMessage: i32,
         last_message: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>> {
@@ -399,7 +401,7 @@ mock! {
         async fn send_message(
             &self,
             message: String,
-            token: &str,
+            token: &Token,
         ) -> Result<NCReqDataMessage, Box<dyn Error>>;
         async fn fetch_autocomplete_users(
             &self,
@@ -407,7 +409,7 @@ mock! {
         ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>>;
         async fn fetch_participants(
             &self,
-            token: &str,
+            token: &Token,
         ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>>;
         async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
         async fn fetch_rooms_update(
@@ -416,12 +418,12 @@ mock! {
         ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
         async fn fetch_chat_initial(
             &self,
-            token: &str,
+            token: &Token,
             maxMessage: i32,
         ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
         async fn fetch_chat_update(
             &self,
-            token: &str,
+            token: &Token,
             maxMessage: i32,
             last_message: i32,
         ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
