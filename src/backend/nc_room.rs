@@ -377,7 +377,7 @@ impl NCRoomInterface for NCRoom {
                     self.update(data_option, requester).await?;
                 }
                 Ordering::Less => {
-                    log::warn!(
+                    log::info!(
                         "Message Id was older than message stored '{}'! Stored {} Upstream {}",
                         self.to_string(),
                         last_internal_id,

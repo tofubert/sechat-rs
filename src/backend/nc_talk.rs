@@ -481,272 +481,301 @@ impl std::fmt::Display for MockNCTalk {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
 
-//     use mockall::Sequence;
+    use mockall::Sequence;
 
-//     use super::*;
-//     use crate::{
-//         backend::nc_request::{
-//             nc_requester::MockNCRequest, NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom,
-//         },
-//         config::init,
-//     };
+    use super::*;
+    use crate::{
+        backend::nc_request::{
+            nc_requester::MockNCRequest, NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom,
+        },
+        config::init,
+    };
 
-//     #[tokio::test]
-//     async fn create_backend() {
-//         let dir = tempfile::tempdir().unwrap();
+    #[tokio::test]
+    async fn create_backend() {
+        let dir = tempfile::tempdir().unwrap();
 
-//         std::env::set_var("HOME", dir.path().as_os_str());
-//         let config = init("./test/").unwrap();
-//         let mut mock_requester = MockNCRequest::new();
-//         let mut mock_requester_file = MockNCRequest::new();
-//         let mut mock_requester_fetch = MockNCRequest::new();
-//         let mock_requester_room = MockNCRequest::new();
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+        let mut mock_requester = MockNCRequest::new();
 
-//         let default_room = NCReqDataRoom {
-//             displayName: "General".to_string(),
-//             roomtype: 2, // Group Chat
-//             ..Default::default()
-//         };
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (chat_tx, chat_rx) = tokio::sync::oneshot::channel();
+        let (update_tx, update_rx) = tokio::sync::oneshot::channel();
+        let (pat_tx, pat_rx) = tokio::sync::oneshot::channel();
 
-//         let default_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 1,
-//             ..Default::default()
-//         };
-//         let update_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 2,
-//             ..Default::default()
-//         };
+        let default_room = NCReqDataRoom {
+            displayName: "General".to_string(),
+            token: "a123".into(),
+            roomtype: 2, // Group Chat
+            ..Default::default()
+        };
+        tx.send(Some((vec![default_room], 1)))
+            .expect("Sending Failed.");
 
-//         mock_requester
-//             .expect_fetch_rooms_initial()
-//             .once()
-//             .returning_st(move || Ok((vec![default_room.clone()], 0)));
-//         mock_requester_fetch
-//             .expect_fetch_chat_initial()
-//             .return_once_st(move |_, _| Ok(vec![default_message.clone()]));
-//         mock_requester_fetch
-//             .expect_fetch_participants()
-//             .times(1)
-//             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
+        let default_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 1,
+            ..Default::default()
+        };
 
-//         mock_requester
-//             .expect_fetch_chat_update()
-//             .return_once_st(move |_, _, _| Ok(vec![update_message.clone()]));
+        chat_tx
+            .send(Some(vec![default_message.clone()]))
+            .expect("Sending Failed.");
 
-//         mock_requester
-//             .expect_fetch_participants()
-//             .times(1)
-//             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
+        let update_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 2,
+            ..Default::default()
+        };
+        update_tx
+            .send(Some(vec![update_message.clone()]))
+            .expect("Sending Failed.");
 
-//         mock_requester_file
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_fetch);
+        pat_tx
+            .send(Some(vec![NCReqDataParticipants::default()]))
+            .expect("Sending Failed.");
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_file);
+        mock_requester
+            .expect_request_rooms_initial()
+            .once()
+            .return_once(move || Ok(rx));
+        mock_requester
+            .expect_request_chat_initial()
+            .return_once(move |_, _| Ok(chat_rx));
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_room);
+        mock_requester
+            .expect_request_participants()
+            .times(1)
+            .return_once(move |_| Ok(pat_rx));
+        mock_requester
+            .expect_request_chat_update()
+            .return_once_st(move |_, _, _| Ok(update_rx));
 
-//         let backend = NCTalk::new(mock_requester, &config)
-//             .await
-//             .expect("Failed to create Backend");
-//         assert_eq!(backend.rooms.len(), 1);
-//     }
+        let backend = NCTalk::new(mock_requester, &config)
+            .await
+            .expect("Failed to create Backend");
+        assert_eq!(backend.rooms.len(), 1);
+    }
 
-//     #[tokio::test]
-//     async fn room_handling() {
-//         let init = init("./test/").unwrap();
-//         let config = init;
+    #[tokio::test]
+    async fn room_handling() {
+        let init = init("./test/").unwrap();
+        let config = init;
 
-//         let mut mock_requester = MockNCRequest::new();
-//         let mut mock_requester_file = MockNCRequest::new();
-//         let mut mock_requester_fetch = MockNCRequest::new();
-//         let mock_requester_room = MockNCRequest::new();
+        let mut mock_requester = MockNCRequest::new();
 
-//         let default_token = Token::from("123");
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (tx2, rx2) = tokio::sync::oneshot::channel();
+        let (chat_tx, chat_rx) = tokio::sync::oneshot::channel();
+        let (update_tx, update_rx) = tokio::sync::oneshot::channel();
+        let (pat_tx, pat_rx) = tokio::sync::oneshot::channel();
+        let (pat2_tx, pat2_rx) = tokio::sync::oneshot::channel();
+        let (send_tx, send_rx) = tokio::sync::oneshot::channel();
+        let (chat_update_tx, chat_update_rx) = tokio::sync::oneshot::channel();
 
-//         let default_room = NCReqDataRoom {
-//             displayName: "General".to_string(),
-//             roomtype: 2, // Group Chat
-//             token: default_token.clone(),
-//             ..Default::default()
-//         };
+        let default_token = Token::from("123");
 
-//         let default_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 1,
-//             ..Default::default()
-//         };
-//         let update_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 2,
-//             ..Default::default()
-//         };
+        let default_room = NCReqDataRoom {
+            displayName: "General".to_string(),
+            roomtype: 2, // Group Chat
+            token: default_token.clone(),
+            ..Default::default()
+        };
 
-//         let post_send_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 3,
-//             ..Default::default()
-//         };
+        let default_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 1,
+            ..Default::default()
+        };
+        let update_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 2,
+            ..Default::default()
+        };
 
-//         let mut seq = Sequence::new();
+        let post_send_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 3,
+            ..Default::default()
+        };
 
-//         mock_requester
-//             .expect_fetch_rooms_initial()
-//             .times(2)
-//             .returning_st(move || Ok((vec![default_room.clone()], 0)));
-//         mock_requester_fetch
-//             .expect_fetch_chat_initial()
-//             .return_once_st(move |_, _| Ok(vec![default_message.clone()]));
-//         mock_requester_fetch
-//             .expect_fetch_participants()
-//             .times(1)
-//             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
-//         mock_requester
-//             .expect_fetch_participants()
-//             .times(2)
-//             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
-//         mock_requester
-//             .expect_fetch_chat_update()
-//             .with(eq(default_token.clone()), eq(200), eq(1))
-//             .once()
-//             .in_sequence(&mut seq)
-//             .return_once_st(move |_, _, _| Ok(vec![update_message.clone()]));
-//         mock_requester
-//             .expect_send_message()
-//             .once()
-//             .in_sequence(&mut seq)
-//             .withf(|message: &String, token: &Token| message == "Test" && *token == "123")
-//             .return_once_st(|_, _| Ok(NCReqDataMessage::default()));
+        let mut seq = Sequence::new();
 
-//         mock_requester
-//             .expect_fetch_chat_update()
-//             .once()
-//             .with(eq(Token::from("123")), eq(200), eq(2))
-//             .in_sequence(&mut seq)
-//             .return_once_st(move |_, _, _| Ok(vec![post_send_message.clone()]));
+        tx.send(Some((vec![default_room.clone()], 1)))
+            .expect("Sending Failed.");
+        tx2.send(Some((vec![default_room.clone()], 1)))
+            .expect("Sending Failed.");
 
-//         mock_requester_file
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_fetch);
+        chat_tx
+            .send(Some(vec![default_message.clone()]))
+            .expect("Sending Failed.");
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_file);
+        update_tx
+            .send(Some(vec![update_message.clone()]))
+            .expect("Sending Failed.");
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_room);
+        pat_tx
+            .send(Some(vec![NCReqDataParticipants::default()]))
+            .expect("Sending Failed.");
+        pat2_tx
+            .send(Some(vec![NCReqDataParticipants::default()]))
+            .expect("Sending Failed.");
 
-//         let backend = NCTalk::new(mock_requester, &config)
-//             .await
-//             .expect("Failed to create Backend");
+        send_tx
+            .send(Some(NCReqDataMessage::default()))
+            .expect("Sending Failed");
 
-//         check_results(backend).await;
-//     }
+        chat_update_tx
+            .send(Some(vec![post_send_message.clone()]))
+            .expect("Failed to send");
 
-//     async fn check_results(mut backend: NCTalk<MockNCRequest>) {
-//         assert!(backend
-//             .send_message("Test".to_owned(), &Token::from("123"))
-//             .await
-//             .is_ok());
+        mock_requester
+            .expect_request_rooms_initial()
+            .once()
+            .return_once(move || Ok(rx));
+        mock_requester
+            .expect_request_rooms_initial()
+            .once()
+            .return_once(move || Ok(rx2));
+        mock_requester
+            .expect_request_chat_initial()
+            .return_once(move |_, _| Ok(chat_rx));
 
-//         assert!(backend.update_rooms(false).await.is_ok());
+        mock_requester
+            .expect_request_participants()
+            .times(1)
+            .return_once(move |_| Ok(pat_rx));
+        mock_requester
+            .expect_request_chat_update()
+            .once()
+            .in_sequence(&mut seq)
+            .return_once(move |_, _, _| Ok(update_rx));
 
-//         assert_eq!(
-//             backend.get_room(&"123".into()).to_token(),
-//             Token::from("123")
-//         );
-//         assert_eq!(backend.get_unread_rooms().len(), 0);
-//         assert_eq!(
-//             backend.get_room_by_displayname("General"),
-//             Token::from("123")
-//         );
-//         assert_eq!(backend.get_dm_keys_display_name_mapping(), vec![]);
-//         assert_eq!(
-//             backend.get_group_keys_display_name_mapping(),
-//             vec![("123".into(), "General".to_string())]
-//         );
-//         assert_eq!(backend.get_room_keys(), vec![&Token::from("123")]);
-//     }
+        mock_requester
+            .expect_request_send_message()
+            .once()
+            .in_sequence(&mut seq)
+            .withf(|message: &String, token: &Token| message == "Test" && *token == "123")
+            .return_once(|_, _| Ok(send_rx));
 
-//     #[tokio::test]
-//     async fn write_to_log() {
-//         let dir = tempfile::tempdir().unwrap();
+        mock_requester
+            .expect_request_chat_update()
+            .once()
+            .with(eq(Token::from("123")), eq(200), eq(2))
+            .in_sequence(&mut seq)
+            .return_once(move |_, _, _| Ok(chat_update_rx));
 
-//         std::env::set_var("HOME", dir.path().as_os_str());
-//         let config = init("./test/").unwrap();
+        mock_requester
+            .expect_request_participants()
+            .times(1)
+            .return_once(move |_| Ok(pat2_rx));
 
-//         println!("Path is {}", config.get_data_dir().display());
+        let backend = NCTalk::new(mock_requester, &config)
+            .await
+            .expect("Failed to create Backend");
 
-//         let mut mock_requester = MockNCRequest::new();
-//         let mut mock_requester_file = MockNCRequest::new();
-//         let mut mock_requester_fetch = MockNCRequest::new();
-//         let mock_requester_room = MockNCRequest::new();
+        check_results(backend).await;
+    }
 
-//         let default_room = NCReqDataRoom {
-//             displayName: "General".to_string(),
-//             token: "a123".into(),
-//             roomtype: 2, // Group Chat
-//             ..Default::default()
-//         };
+    async fn check_results(mut backend: NCTalk<MockNCRequest>) {
+        assert!(backend
+            .send_message("Test".to_owned(), &Token::from("123"))
+            .await
+            .is_ok());
 
-//         let default_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 1,
-//             ..Default::default()
-//         };
-//         let update_message = NCReqDataMessage {
-//             messageType: "comment".to_string(),
-//             id: 2,
-//             ..Default::default()
-//         };
+        assert!(backend.update_rooms(false).await.is_ok());
 
-//         mock_requester
-//             .expect_fetch_rooms_initial()
-//             .once()
-//             .returning_st(move || Ok((vec![default_room.clone()], 0)));
-//         mock_requester_fetch
-//             .expect_fetch_chat_initial()
-//             .return_once_st(move |_, _| Ok(vec![default_message.clone()]));
-//         mock_requester_fetch
-//             .expect_fetch_participants()
-//             .times(1)
-//             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
-//         mock_requester
-//             .expect_fetch_participants()
-//             .times(1)
-//             .returning_st(move |_| Ok(vec![NCReqDataParticipants::default()]));
-//         mock_requester
-//             .expect_fetch_chat_update()
-//             .return_once_st(move |_, _, _| Ok(vec![update_message.clone()]));
+        assert_eq!(
+            backend.get_room(&"123".into()).to_token(),
+            Token::from("123")
+        );
+        assert_eq!(backend.get_unread_rooms().len(), 0);
+        assert_eq!(
+            backend.get_room_by_displayname("General"),
+            Token::from("123")
+        );
+        assert_eq!(backend.get_dm_keys_display_name_mapping(), vec![]);
+        assert_eq!(
+            backend.get_group_keys_display_name_mapping(),
+            vec![("123".into(), "General".to_string())]
+        );
+        assert_eq!(backend.get_room_keys(), vec![&Token::from("123")]);
+    }
 
-//         mock_requester_file
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_fetch);
+    #[tokio::test]
+    async fn write_to_log() {
+        let dir = tempfile::tempdir().unwrap();
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_file);
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
 
-//         mock_requester
-//             .expect_clone()
-//             .return_once_st(|| mock_requester_room);
+        println!("Path is {}", config.get_data_dir().display());
 
-//         let mut backend = NCTalk::new(mock_requester, &config)
-//             .await
-//             .expect("Failed to create Backend");
-//         assert_eq!(backend.rooms.len(), 1);
+        let mut mock_requester = MockNCRequest::new();
 
-//         backend.write_to_log().unwrap();
-//         dir.close().unwrap();
-//     }
-// }
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (chat_tx, chat_rx) = tokio::sync::oneshot::channel();
+        let (update_tx, update_rx) = tokio::sync::oneshot::channel();
+        let (pat_tx, pat_rx) = tokio::sync::oneshot::channel();
+
+        let default_room = NCReqDataRoom {
+            displayName: "General".to_string(),
+            token: "a123".into(),
+            roomtype: 2, // Group Chat
+            ..Default::default()
+        };
+        tx.send(Some((vec![default_room], 1)))
+            .expect("Sending Failed.");
+
+        let default_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 1,
+            ..Default::default()
+        };
+
+        chat_tx
+            .send(Some(vec![default_message.clone()]))
+            .expect("Sending Failed.");
+
+        let update_message = NCReqDataMessage {
+            messageType: "comment".to_string(),
+            id: 2,
+            ..Default::default()
+        };
+        update_tx
+            .send(Some(vec![update_message.clone()]))
+            .expect("Sending Failed.");
+
+        pat_tx
+            .send(Some(vec![NCReqDataParticipants::default()]))
+            .expect("Sending Failed.");
+
+        mock_requester
+            .expect_request_rooms_initial()
+            .once()
+            .return_once(move || Ok(rx));
+        mock_requester
+            .expect_request_chat_initial()
+            .return_once(move |_, _| Ok(chat_rx));
+
+        mock_requester
+            .expect_request_participants()
+            .times(1)
+            .return_once(move |_| Ok(pat_rx));
+        mock_requester
+            .expect_request_chat_update()
+            .return_once_st(move |_, _, _| Ok(update_rx));
+
+        let mut backend = NCTalk::new(mock_requester, &config)
+            .await
+            .expect("Failed to create Backend");
+        assert_eq!(backend.rooms.len(), 1);
+
+        backend.write_to_log().unwrap();
+        dir.close().unwrap();
+    }
+}
