@@ -19,8 +19,13 @@ exclude = [
   "*.log",
   "tags",
 ]
+[[bin]]
+name = "sechat"
+path = "src/main.rs"
 
-
+# [[bin]]
+# name = "sechat-test"
+# path = "src/main2.rs"
 
 [build-dependencies]
 cargo-make = "0.37.23"

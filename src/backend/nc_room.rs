@@ -10,6 +10,8 @@ use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
 use std::fmt::{Debug, Display};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[derive(Debug, FromPrimitive, PartialEq, Default)]
 pub enum NCRoomTypes {
@@ -49,21 +51,21 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
         &mut self,
         message_id: i32,
         data_option: Option<NCReqDataRoom>,
-        requester: &Requester,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
     async fn send<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
         message: String,
-        requester: &Requester,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<String, Box<dyn std::error::Error>>;
     async fn update<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         data_option: Option<NCReqDataRoom>,
-        requester: &Requester,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<Option<(String, usize)>, Box<dyn std::error::Error>>;
     async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
-        requester: &Requester,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
@@ -79,7 +81,7 @@ pub struct NCRoom {
 impl NCRoom {
     pub async fn new<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         room_data: NCReqDataRoom,
-        requester: Requester,
+        requester: Arc<Mutex<Requester>>,
         path_to_log: std::path::PathBuf,
     ) -> Option<NCRoom> {
         let mut tmp_path_buf = path_to_log.clone();
@@ -98,20 +100,31 @@ impl NCRoom {
                     "Failed to parse json for {}, falling back to fetching",
                     room_data.displayName
                 );
-                NCRoom::fetch_messages::<Requester>(&requester, &room_data.token, &mut messages)
-                    .await
-                    .ok();
+                NCRoom::fetch_messages::<Requester>(
+                    requester.clone(),
+                    &room_data.token,
+                    &mut messages,
+                )
+                .await
+                .ok();
             }
         } else {
             log::debug!("No Log File found for room {}", room_data.displayName);
-            NCRoom::fetch_messages::<Requester>(&requester, &room_data.token, &mut messages)
+            NCRoom::fetch_messages::<Requester>(requester.clone(), &room_data.token, &mut messages)
                 .await
                 .ok();
         }
-        let participants = requester
-            .request_participants_participants(&room_data.token)
+        let response_onceshot = requester
+            .lock()
             .await
-            .expect("Failed to fetch room participants");
+            .request_participants(&room_data.token)
+            .await
+            .unwrap();
+        let participants = response_onceshot
+            .await
+            .expect("Failed for fetch chat participants")
+            .ok_or("Failed request")
+            .unwrap();
 
         Some(NCRoom {
             messages,
@@ -122,11 +135,21 @@ impl NCRoom {
         })
     }
     async fn fetch_messages<Requester: NCRequestInterface + 'static + std::marker::Sync>(
-        requester: &Requester,
+        requester: Arc<Mutex<Requester>>,
         token: &Token,
         messages: &mut Vec<NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let response = requester.fetch_chat_initial(token, 200).await?;
+        let response_onceshot = requester
+            .lock()
+            .await
+            .request_chat_initial(token, 200)
+            .await
+            .unwrap();
+        let response = response_onceshot
+            .await
+            .expect("Failed for fetch chat update")
+            .ok_or("Failed request")
+            .unwrap();
         for message in response {
             messages.push(message.into());
         }
@@ -240,31 +263,46 @@ impl NCRoomInterface for NCRoom {
     async fn send<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
         message: String,
-        requester: &Requester,
+        requester: Arc<Mutex<Requester>>,
     ) -> Result<String, Box<dyn std::error::Error>> {
         log::debug!("Send Message {}", &message);
-        let response = requester.send_message(message, &self.room_data.token).await;
+        let response_onceshot = requester
+            .lock()
+            .await
+            .request_send_message(message, &self.room_data.token)
+            .await
+            .unwrap();
+        let response = response_onceshot
+            .await
+            .expect("Failed for fetch chat participants");
         match response {
-            Ok(v) => Ok(v.message),
-            Err(v) => Err(v),
+            Some(v) => Ok(v.message),
+            None => Err("Failed to Send Message".into()),
         }
     }
 
     async fn update<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         data_option: Option<NCReqDataRoom>,
-        requester: &Requester,
+        requester: Arc<Mutex<Requester>>,
     ) -> Result<Option<(String, usize)>, Box<dyn std::error::Error>> {
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
-        let response = requester
-            .fetch_chat_update(
+        let response_onceshot = requester
+            .lock()
+            .await
+            .request_chat_update(
                 &self.room_data.token,
                 200,
                 self.messages.last().unwrap().get_id(),
             )
             .await
+            .unwrap();
+        let response = response_onceshot
+            .await
+            .expect("Failed for fetch chat update")
+            .ok_or("Failed request")
             .unwrap();
 
         let is_empty = response.is_empty();
@@ -280,10 +318,17 @@ impl NCRoomInterface for NCRoom {
         for message in response {
             self.messages.push(message.into());
         }
-        self.participants = requester
-            .fetch_participants(&self.room_data.token)
+        let response_onceshot = requester
+            .lock()
             .await
-            .expect("Failed to fetch room participants");
+            .request_participants(&self.room_data.token)
+            .await
+            .unwrap();
+        self.participants = response_onceshot
+            .await
+            .expect("Failed for fetch chat participants")
+            .ok_or("Failed request")
+            .unwrap();
         if self.has_unread() && !is_empty {
             Ok(update_info)
         } else {
@@ -292,15 +337,23 @@ impl NCRoomInterface for NCRoom {
     }
     async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
-        requester: &Requester,
+        requester: Arc<Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
-            requester
-                .mark_chat_read(
+            let response_onceshot = requester
+                .lock()
+                .await
+                .request_mark_chat_read(
                     &self.room_data.token,
                     self.messages.last().ok_or("No last message")?.get_id(),
                 )
-                .await?;
+                .await
+                .unwrap();
+            response_onceshot
+                .await
+                .expect("Failed for fetch chat participants")
+                .ok_or("Failed request")
+                .unwrap();
         }
         Ok(())
     }
@@ -308,7 +361,7 @@ impl NCRoomInterface for NCRoom {
         &mut self,
         message_id: i32,
         data_option: Option<NCReqDataRoom>,
-        requester: &Requester,
+        requester: Arc<Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         use std::cmp::Ordering;
 
