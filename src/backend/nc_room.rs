@@ -1,7 +1,8 @@
 use super::{
     nc_message::NCMessage,
     nc_request::{
-        NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCRequestInterface, Token,
+        nc_requester::NCRequestInterface, NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom,
+        Token,
     },
 };
 use async_trait::async_trait;
@@ -108,7 +109,7 @@ impl NCRoom {
                 .ok();
         }
         let participants = requester
-            .fetch_participants(&room_data.token)
+            .request_participants_participants(&room_data.token)
             .await
             .expect("Failed to fetch room participants");
 

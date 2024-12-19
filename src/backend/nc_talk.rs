@@ -1,6 +1,6 @@
 use crate::{
     backend::{
-        nc_request::{NCReqDataRoom, NCRequestInterface},
+        nc_request::{nc_requester::NCRequestInterface, NCReqDataRoom},
         nc_room::NCRoomInterface,
     },
     config::Config,
@@ -9,9 +9,11 @@ use async_trait::async_trait;
 use itertools::Itertools;
 use std::{
     collections::HashMap,
+    default,
     error::Error,
     fmt::Debug,
     path::{Path, PathBuf},
+    sync::mpsc,
 };
 
 use super::{
