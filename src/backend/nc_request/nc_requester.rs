@@ -184,15 +184,35 @@ impl NCRequest {
 
         tokio::spawn(async move {
             loop {
-                if let Some(req) = rx.recv().await {
+                let mut buffer: Vec<ApiRequests> = vec![];
+                let added = rx.recv_many(&mut buffer, 5).await;
+                log::debug!("got {} requests to API", added);
+
+                if added == 0 {
+                    buffer.push(rx.recv().await.expect("Failed to get message"));
+                }
+
+                while worker_queue
+                    .first()
+                    .expect("No Element in worker queue")
+                    .capacity()
+                    < 5
+                {
                     worker_queue.sort_by_key(tokio::sync::mpsc::Sender::capacity);
+                }
+                log::debug!(
+                    "Capacity of first {} and last {} worker",
+                    worker_queue.first().unwrap().capacity(),
+                    worker_queue.last().unwrap().capacity()
+                );
+                for message in buffer {
                     worker_queue
                         .first()
                         .expect("No Thread?")
-                        .send(req)
+                        .send(message)
                         .await
                         .expect("Failed to fwd request to worker.");
-                };
+                }
             }
         });
         log::info!("Spawned API Thread");

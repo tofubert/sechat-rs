@@ -14,7 +14,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::JoinHandle};
 
 use super::{
     nc_request::Token,
@@ -62,13 +62,17 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
         rooms: &mut HashMap<Token, NCRoom>,
         chat_log_path: PathBuf,
     ) {
-        let v = response.into_iter().map(|child| {
-            tokio::spawn(NCTalk::<Requester>::new_room(
-                child,
-                Arc::clone(&raw_requester),
-                chat_log_path.clone(),
-            ))
-        });
+        let v: Vec<JoinHandle<(String, Option<NCRoom>)>> = response
+            .into_iter()
+            .map(|child| {
+                tokio::spawn(NCTalk::<Requester>::new_room(
+                    child,
+                    Arc::clone(&raw_requester),
+                    chat_log_path.clone(),
+                ))
+            })
+            .collect();
+        log::debug!("Got {} initial threads", v.len());
         for jh in v {
             let (name, room_option) = jh.await.unwrap();
             if let Some(room) = room_option {
@@ -96,6 +100,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
                 )),
             );
         }
+        log::debug!("Got {} initial threads", handles.capacity());
         for (token, room_future) in &mut handles {
             //we can safely unwrap here bc the json file on disk shall never be this broken.
             let mut json_room = room_future.await?.unwrap();
@@ -140,12 +145,14 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
 
         let requester = Arc::new(Mutex::new(raw_requester));
 
-        let resp = requester
-            .lock()
-            .await
-            .request_rooms_initial()
-            .await
-            .expect("Initial fetching of rooms on startup failed.");
+        let resp = {
+            requester
+                .lock()
+                .await
+                .request_rooms_initial()
+                .await
+                .expect("Initial fetching of rooms on startup failed.")
+        };
         let (response, last_requested) = resp
             .await
             .expect("Initial fetching of rooms failed.")
@@ -363,25 +370,27 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
 
     async fn update_rooms(&mut self, force_update: bool) -> Result<Vec<String>, Box<dyn Error>> {
         let (response, timestamp) = if force_update {
-            let resp = self
-                .requester
-                .lock()
-                .await
-                .request_rooms_update(self.last_requested)
-                .await
-                .expect("Initial fetching of rooms on startup failed.");
+            let resp = {
+                self.requester
+                    .lock()
+                    .await
+                    .request_rooms_update(self.last_requested)
+                    .await
+                    .expect("Initial fetching of rooms on startup failed.")
+            };
             resp.await
                 .expect("Initial fetching of rooms failed.")
                 .ok_or("No rooms found")
                 .expect("No rooms")
         } else {
-            let resp = self
-                .requester
-                .lock()
-                .await
-                .request_rooms_initial()
-                .await
-                .expect("Initial fetching of rooms on startup failed.");
+            let resp = {
+                self.requester
+                    .lock()
+                    .await
+                    .request_rooms_initial()
+                    .await
+                    .expect("Initial fetching of rooms on startup failed.")
+            };
             resp.await
                 .expect("Initial fetching of rooms failed.")
                 .ok_or("No rooms found")

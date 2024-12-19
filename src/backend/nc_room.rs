@@ -128,12 +128,14 @@ impl NCRoom {
         token: &Token,
         messages: &mut Vec<NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let response_onceshot = requester
-            .lock()
-            .await
-            .request_chat_initial(token, 200)
-            .await
-            .unwrap();
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_chat_initial(token, 200)
+                .await
+                .unwrap()
+        };
         let response = response_onceshot
             .await
             .expect("Failed for fetch chat update")
@@ -255,12 +257,14 @@ impl NCRoomInterface for NCRoom {
         requester: Arc<Mutex<Requester>>,
     ) -> Result<String, Box<dyn std::error::Error>> {
         log::debug!("Send Message {}", &message);
-        let response_onceshot = requester
-            .lock()
-            .await
-            .request_send_message(message, &self.room_data.token)
-            .await
-            .unwrap();
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_send_message(message, &self.room_data.token)
+                .await
+                .unwrap()
+        };
         let response = response_onceshot
             .await
             .expect("Failed for fetch chat participants");
@@ -278,16 +282,18 @@ impl NCRoomInterface for NCRoom {
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
-        let response_onceshot = requester
-            .lock()
-            .await
-            .request_chat_update(
-                &self.room_data.token,
-                200,
-                self.messages.last().unwrap().get_id(),
-            )
-            .await
-            .unwrap();
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_chat_update(
+                    &self.room_data.token,
+                    200,
+                    self.messages.last().unwrap().get_id(),
+                )
+                .await
+                .unwrap()
+        };
         let response = response_onceshot
             .await
             .expect("Failed for fetch chat update")
@@ -307,12 +313,15 @@ impl NCRoomInterface for NCRoom {
         for message in response {
             self.messages.push(message.into());
         }
-        let response_onceshot = requester
-            .lock()
-            .await
-            .request_participants(&self.room_data.token)
-            .await
-            .unwrap();
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_participants(&self.room_data.token)
+                .await
+                .unwrap()
+        };
+
         self.participants = response_onceshot
             .await
             .expect("Failed for fetch chat participants")
@@ -329,15 +338,17 @@ impl NCRoomInterface for NCRoom {
         requester: Arc<Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
-            let response_onceshot = requester
-                .lock()
-                .await
-                .request_mark_chat_read(
-                    &self.room_data.token,
-                    self.messages.last().ok_or("No last message")?.get_id(),
-                )
-                .await
-                .unwrap();
+            let response_onceshot = {
+                requester
+                    .lock()
+                    .await
+                    .request_mark_chat_read(
+                        &self.room_data.token,
+                        self.messages.last().ok_or("No last message")?.get_id(),
+                    )
+                    .await
+                    .unwrap()
+            };
             response_onceshot
                 .await
                 .expect("Failed for fetch chat participants")
