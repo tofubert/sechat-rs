@@ -114,23 +114,12 @@ impl NCRoom {
                 .await
                 .ok();
         }
-        let response_onceshot = requester
-            .lock()
-            .await
-            .request_participants(&room_data.token)
-            .await
-            .unwrap();
-        let participants = response_onceshot
-            .await
-            .expect("Failed for fetch chat participants")
-            .ok_or("Failed request")
-            .unwrap();
 
         Some(NCRoom {
             messages,
             path_to_log: tmp_path_buf,
             room_type: FromPrimitive::from_i32(room_data.roomtype).unwrap(),
-            participants,
+            participants: vec![],
             room_data,
         })
     }

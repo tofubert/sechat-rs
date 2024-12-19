@@ -57,7 +57,7 @@ impl NCRequestWorker {
             .default_headers(headers.clone())
             .build()?;
 
-        log::warn!("Worker Ready");
+        log::info!("Worker Ready {}", base_url.to_string());
 
         Ok(NCRequestWorker {
             base_url: base_url.to_string(),

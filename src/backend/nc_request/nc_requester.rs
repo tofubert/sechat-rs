@@ -1,16 +1,13 @@
-use tokio::{
-    sync::{
-        mpsc::{self, Sender},
-        oneshot,
-    },
-    time::{sleep, Duration},
+use tokio::sync::{
+    mpsc::{self, Sender},
+    oneshot,
 };
 
 use crate::config::Config;
 use async_trait::async_trait;
 
-use std::error::Error;
 use std::fmt::Debug;
+use std::{error::Error, fmt};
 
 #[cfg(test)]
 use mockall::{mock, predicate::*};
@@ -20,7 +17,7 @@ use super::{
     NCReqDataUser, Token,
 };
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub enum ApiRequests {
     #[default]
     None,
@@ -37,6 +34,30 @@ pub enum ApiRequests {
     ),
     FetchAutocompleteUsers(String, oneshot::Sender<Option<Vec<NCReqDataUser>>>),
     MarkChatRead(Token, i32, oneshot::Sender<Option<()>>),
+}
+
+impl fmt::Display for ApiRequests {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ApiRequests::None => write!(f, "Invalid"),
+            ApiRequests::SendMessage(token, _, _) => write!(f, "SendMessage {token}"),
+            ApiRequests::FetchRoomsInitial(_) => write!(f, "FetchRoomsInitial"),
+            ApiRequests::FetchRoomsUpdate(last_timestamp, _) => {
+                write!(f, "FetchRoomsUpdate {last_timestamp}")
+            }
+            ApiRequests::FetchParticipants(token, _) => write!(f, "FetchParticipants {token}"),
+            ApiRequests::FetchChatInitial(token, maxMessage, _) => {
+                write!(f, "FetchChatInitial {token} {maxMessage}")
+            }
+            ApiRequests::FetchChatUpdate(token, maxMessage, last_message, _) => {
+                write!(f, "FetchChatUpdate {token} {maxMessage} {last_message}")
+            }
+            ApiRequests::FetchAutocompleteUsers(name, _) => {
+                write!(f, "FetchAutocompleteUsers {name}")
+            }
+            ApiRequests::MarkChatRead(token, i32, _) => write!(f, "MarkChatRead {token}"),
+        }
+    }
 }
 
 #[async_trait]
@@ -89,11 +110,11 @@ impl NCRequest {
         let (tx, mut rx) = mpsc::channel::<ApiRequests>(50);
 
         let worker = NCRequestWorker::new(config).unwrap();
-        log::warn!("Spawn Now");
 
         tokio::spawn(async move {
             loop {
                 if let Some(req) = rx.recv().await {
+                    log::debug!("got a new API Request {}", req);
                     match req {
                         ApiRequests::FetchChatInitial(token, maxMessage, response) => {
                             response
@@ -116,7 +137,6 @@ impl NCRequest {
                             response
                                 .send(Some(worker.fetch_rooms_initial().await.unwrap()))
                                 .expect("could not Send.");
-                            log::warn!("Send Room Fetch Request");
                         }
                         ApiRequests::FetchRoomsUpdate(last_timestamp, response) => {
                             response
@@ -149,10 +169,9 @@ impl NCRequest {
                         }
                     }
                 };
-                sleep(Duration::from_millis(100)).await;
             }
         });
-        log::warn!("Spawn Done");
+        log::info!("Spawned API Thread");
 
         NCRequest { request_tx: tx }
     }
