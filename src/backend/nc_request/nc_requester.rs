@@ -21,19 +21,36 @@ use super::{
 pub enum ApiRequests {
     #[default]
     None,
-    SendMessage(Token, String, oneshot::Sender<Option<NCReqDataMessage>>),
-    FetchRoomsInitial(oneshot::Sender<Option<(Vec<NCReqDataRoom>, i64)>>),
-    FetchRoomsUpdate(i64, oneshot::Sender<Option<(Vec<NCReqDataRoom>, i64)>>),
-    FetchParticipants(Token, oneshot::Sender<Option<Vec<NCReqDataParticipants>>>),
-    FetchChatInitial(Token, i32, oneshot::Sender<Option<Vec<NCReqDataMessage>>>),
+    SendMessage(
+        Token,
+        String,
+        oneshot::Sender<Result<NCReqDataMessage, Box<dyn Error>>>,
+    ),
+    FetchRoomsInitial(oneshot::Sender<Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>>),
+    FetchRoomsUpdate(
+        i64,
+        oneshot::Sender<Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>>,
+    ),
+    FetchParticipants(
+        Token,
+        oneshot::Sender<Result<Vec<NCReqDataParticipants>, Box<dyn Error>>>,
+    ),
+    FetchChatInitial(
+        Token,
+        i32,
+        oneshot::Sender<Result<Vec<NCReqDataMessage>, Box<dyn Error>>>,
+    ),
     FetchChatUpdate(
         Token,
         i32,
         i32,
-        oneshot::Sender<Option<Vec<NCReqDataMessage>>>,
+        oneshot::Sender<Result<Vec<NCReqDataMessage>, Box<dyn Error>>>,
     ),
-    FetchAutocompleteUsers(String, oneshot::Sender<Option<Vec<NCReqDataUser>>>),
-    MarkChatRead(Token, i32, oneshot::Sender<Option<()>>),
+    FetchAutocompleteUsers(
+        String,
+        oneshot::Sender<Result<Vec<NCReqDataUser>, Box<dyn Error>>>,
+    ),
+    MarkChatRead(Token, i32, oneshot::Sender<Result<(), Box<dyn Error>>>),
 }
 
 impl fmt::Display for ApiRequests {
@@ -60,44 +77,35 @@ impl fmt::Display for ApiRequests {
     }
 }
 
+type ApiResult<T> =
+    Result<tokio::sync::oneshot::Receiver<Result<T, Box<dyn Error>>>, Box<dyn Error>>;
+
 #[async_trait]
 pub trait NCRequestInterface: Debug + Send + Send + Sync {
     async fn request_send_message(
         &self,
         message: String,
         token: &Token,
-    ) -> Result<tokio::sync::oneshot::Receiver<Option<NCReqDataMessage>>, Box<dyn Error>>;
-    async fn request_autocomplete_users(
-        &self,
-        name: &str,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataUser>>>, Box<dyn Error>>;
-    async fn request_participants(
-        &self,
-        token: &Token,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataParticipants>>>, Box<dyn Error>>;
-    async fn request_rooms_initial(
-        &self,
-    ) -> Result<oneshot::Receiver<Option<(Vec<NCReqDataRoom>, i64)>>, Box<dyn Error>>;
+    ) -> ApiResult<NCReqDataMessage>;
+    async fn request_autocomplete_users(&self, name: &str) -> ApiResult<Vec<NCReqDataUser>>;
+    async fn request_participants(&self, token: &Token) -> ApiResult<Vec<NCReqDataParticipants>>;
+    async fn request_rooms_initial(&self) -> ApiResult<(Vec<NCReqDataRoom>, i64)>;
     async fn request_rooms_update(
         &self,
         last_timestamp: i64,
-    ) -> Result<oneshot::Receiver<Option<(Vec<NCReqDataRoom>, i64)>>, Box<dyn Error>>;
+    ) -> ApiResult<(Vec<NCReqDataRoom>, i64)>;
     async fn request_chat_initial(
         &self,
         token: &Token,
         maxMessage: i32,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataMessage>>>, Box<dyn Error>>;
+    ) -> ApiResult<Vec<NCReqDataMessage>>;
     async fn request_chat_update(
         &self,
         token: &Token,
         maxMessage: i32,
         last_message: i32,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataMessage>>>, Box<dyn Error>>;
-    async fn request_mark_chat_read(
-        &self,
-        token: &str,
-        last_message: i32,
-    ) -> Result<oneshot::Receiver<Option<()>>, Box<dyn Error>>;
+    ) -> ApiResult<Vec<NCReqDataMessage>>;
+    async fn request_mark_chat_read(&self, token: &str, last_message: i32) -> ApiResult<()>;
 }
 
 #[derive(Debug)]
@@ -111,51 +119,48 @@ impl NCRequest {
         match req {
             ApiRequests::FetchChatInitial(token, maxMessage, response) => {
                 response
-                    .send(Some(
-                        worker.fetch_chat_initial(&token, maxMessage).await.unwrap(),
-                    ))
+                    .send(Ok(worker
+                        .fetch_chat_initial(&token, maxMessage)
+                        .await
+                        .unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::FetchChatUpdate(token, maxMessage, last_message, response) => {
                 response
-                    .send(Some(
-                        worker
-                            .fetch_chat_update(&token, maxMessage, last_message)
-                            .await
-                            .unwrap(),
-                    ))
+                    .send(Ok(worker
+                        .fetch_chat_update(&token, maxMessage, last_message)
+                        .await
+                        .unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::FetchRoomsInitial(response) => {
                 response
-                    .send(Some(worker.fetch_rooms_initial().await.unwrap()))
+                    .send(Ok(worker.fetch_rooms_initial().await.unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::FetchRoomsUpdate(last_timestamp, response) => {
                 response
-                    .send(Some(
-                        worker.fetch_rooms_update(last_timestamp).await.unwrap(),
-                    ))
+                    .send(Ok(worker.fetch_rooms_update(last_timestamp).await.unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::SendMessage(token, message, response) => {
                 response
-                    .send(Some(worker.send_message(message, &token).await.unwrap()))
+                    .send(Ok(worker.send_message(message, &token).await.unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::FetchAutocompleteUsers(name, response) => {
                 response
-                    .send(Some(worker.fetch_autocomplete_users(&name).await.unwrap()))
+                    .send(Ok(worker.fetch_autocomplete_users(&name).await.unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::FetchParticipants(token, response) => {
                 response
-                    .send(Some(worker.fetch_participants(&token).await.unwrap()))
+                    .send(Ok(worker.fetch_participants(&token).await.unwrap()))
                     .expect("could not Send.");
             }
             ApiRequests::MarkChatRead(token, last_message, response) => {
                 worker.mark_chat_read(&token, last_message).await.unwrap();
-                response.send(Some(())).expect("could not Send.");
+                response.send(Ok(())).expect("could not Send.");
             }
             ApiRequests::None => {
                 log::warn!("Unknown Request");
@@ -175,7 +180,7 @@ impl NCRequest {
 
             tokio::spawn(async move {
                 loop {
-                    if let Some(req) = rx_worker.recv().await {
+                    if let Ok(req) = rx_worker.recv().await {
                         NCRequest::handle_req(&worker, req).await;
                     };
                 }
@@ -227,7 +232,7 @@ impl NCRequestInterface for NCRequest {
         &self,
         message: String,
         token: &Token,
-    ) -> Result<tokio::sync::oneshot::Receiver<Option<NCReqDataMessage>>, Box<dyn Error>> {
+    ) -> ApiResult<NCReqDataMessage> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.request_tx
             .send(ApiRequests::SendMessage(token.clone(), message, tx))
@@ -235,10 +240,7 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
-
-    async fn request_rooms_initial(
-        &self,
-    ) -> Result<oneshot::Receiver<Option<(Vec<NCReqDataRoom>, i64)>>, Box<dyn Error>> {
+    async fn request_rooms_initial(&self) -> ApiResult<(Vec<NCReqDataRoom>, i64)> {
         let (tx, rx) = tokio::sync::oneshot::channel();
         self.request_tx
             .send(ApiRequests::FetchRoomsInitial(tx))
@@ -246,10 +248,7 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
-    async fn request_autocomplete_users(
-        &self,
-        name: &str,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataUser>>>, Box<dyn Error>> {
+    async fn request_autocomplete_users(&self, name: &str) -> ApiResult<Vec<NCReqDataUser>> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx
@@ -258,10 +257,7 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
-    async fn request_participants(
-        &self,
-        token: &Token,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataParticipants>>>, Box<dyn Error>> {
+    async fn request_participants(&self, token: &Token) -> ApiResult<Vec<NCReqDataParticipants>> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx
@@ -274,7 +270,7 @@ impl NCRequestInterface for NCRequest {
     async fn request_rooms_update(
         &self,
         last_timestamp: i64,
-    ) -> Result<oneshot::Receiver<Option<(Vec<NCReqDataRoom>, i64)>>, Box<dyn Error>> {
+    ) -> ApiResult<(Vec<NCReqDataRoom>, i64)> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx
@@ -283,11 +279,7 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
-    async fn request_chat_initial(
-        &self,
-        token: &Token,
-        maxMessage: i32,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataMessage>>>, Box<dyn Error>> {
+    async fn request_chat_initial(&self, token: &Token, maxMessage: i32) -> ApiResult<()> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx
@@ -301,7 +293,7 @@ impl NCRequestInterface for NCRequest {
         token: &Token,
         maxMessage: i32,
         last_message: i32,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataMessage>>>, Box<dyn Error>> {
+    ) -> ApiResult<Vec<NCReqDataMessage>> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx
@@ -342,41 +334,29 @@ mock! {
     #[async_trait]
     impl NCRequestInterface for NCRequest {
       async fn request_send_message(
-          &self,
-          message: String,
-          token: &Token,
-      ) -> Result<tokio::sync::oneshot::Receiver<Option<NCReqDataMessage>>, Box<dyn Error>>;
-      async fn request_autocomplete_users(
         &self,
-        name: &str,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataUser>>>, Box<dyn Error>>;
-    async fn request_participants(
-        &self,
+        message: String,
         token: &Token,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataParticipants>>>, Box<dyn Error>>;
-    async fn request_rooms_initial(
-        &self,
-    ) -> Result<oneshot::Receiver<Option<(Vec<NCReqDataRoom>, i64)>>, Box<dyn Error>>;
+    ) -> ApiResult<NCReqDataMessage>;
+    async fn request_autocomplete_users(&self, name: &str) -> ApiResult<Vec<NCReqDataUser>>;
+    async fn request_participants(&self, token: &Token) -> ApiResult<Vec<NCReqDataParticipants>>;
+    async fn request_rooms_initial(&self) -> ApiResult<(Vec<NCReqDataRoom>, i64)>;
     async fn request_rooms_update(
         &self,
         last_timestamp: i64,
-    ) -> Result<oneshot::Receiver<Option<(Vec<NCReqDataRoom>, i64)>>, Box<dyn Error>>;
+    ) -> ApiResult<(Vec<NCReqDataRoom>, i64)>;
     async fn request_chat_initial(
         &self,
         token: &Token,
         maxMessage: i32,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataMessage>>>, Box<dyn Error>>;
+    ) -> ApiResult<Vec<NCReqDataMessage>>;
     async fn request_chat_update(
         &self,
         token: &Token,
         maxMessage: i32,
         last_message: i32,
-    ) -> Result<oneshot::Receiver<Option<Vec<NCReqDataMessage>>>, Box<dyn Error>>;
-    async fn request_mark_chat_read(
-        &self,
-        token: &str,
-        last_message: i32,
-    ) -> Result<oneshot::Receiver<Option<()>>, Box<dyn Error>>;
+    ) -> ApiResult<Vec<NCReqDataMessage>>;
+    async fn request_mark_chat_read(&self, token: &str, last_message: i32) -> ApiResult<()>;
     }
     impl Clone for NCRequest {   // specification of the trait to mock
         fn clone(&self) -> Self;
