@@ -2,15 +2,15 @@ use crate::config::Config;
 use notify_rust::{Hint, Notification, Timeout};
 
 #[derive(Debug, Clone, Default)]
-pub struct NCNotify {
+pub struct NotifyWrapper {
     app_name: String,
     timeout: Timeout,
     silent: bool,
 }
 
-impl NCNotify {
+impl NotifyWrapper {
     pub fn new(config: &Config) -> Self {
-        NCNotify {
+        NotifyWrapper {
             app_name: config.data.general.chat_server_name.clone(),
             timeout: if config.data.notifications.persistent {
                 Timeout::Never
@@ -65,5 +65,25 @@ impl NCNotify {
     /// return `true` if notification is persistent (has infinite display timeout)
     pub fn is_persistent(&self) -> bool {
         self.timeout == Timeout::Never
+    }
+
+    pub fn maybe_notify_new_message(
+        &self,
+        input: Option<(String, usize)>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some((displayname, size)) = input {
+            self.unread_message(&displayname, size)?;
+        }
+        Ok(())
+    }
+
+    pub fn maybe_notify_new_rooms(
+        &self,
+        input: Vec<String>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for displayname in input {
+            self.new_room(&displayname)?;
+        }
+        Ok(())
     }
 }

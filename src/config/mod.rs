@@ -179,7 +179,7 @@ impl Config {
         let log_file = FileAppender::builder()
             // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
             .encoder(Box::new(PatternEncoder::new(
-                "{d(%H:%M:%S)} {l} {M}: {m}{n}",
+                "{d(%H:%M:%S%.3f)} {l} {i} {M}: {m}{n}",
             )))
             .append(false)
             .build(log_path)

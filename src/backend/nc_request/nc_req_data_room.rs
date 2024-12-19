@@ -1,11 +1,11 @@
-use super::NCReqDataMessage;
+use super::{NCReqDataMessage, Token};
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct NCReqDataRoom {
     pub id: i32,
-    pub token: String,
+    pub token: Token,
     #[serde(rename = "type")]
     pub roomtype: i32,
     pub name: String,

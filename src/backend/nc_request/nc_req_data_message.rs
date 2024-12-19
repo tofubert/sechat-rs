@@ -1,6 +1,13 @@
-use super::NCReqDataMessageParameter;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct NCReqDataMessageParameter {
+    #[serde(rename = "type")]
+    param_type: String,
+    id: String,
+    name: String,
+}
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessage {

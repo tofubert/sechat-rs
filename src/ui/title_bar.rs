@@ -1,3 +1,4 @@
+use crate::backend::nc_request::Token;
 use crate::backend::nc_room::NCRoomInterface;
 use crate::config::Config;
 use crate::{backend::nc_talk::NCBackend, ui::app::CurrentScreen};
@@ -32,10 +33,15 @@ impl TitleBar<'_> {
         }
     }
 
-    pub fn update(&mut self, screen: CurrentScreen, backend: &impl NCBackend) {
+    pub fn update(
+        &mut self,
+        screen: CurrentScreen,
+        backend: &impl NCBackend,
+        current_room: &Token,
+    ) {
         self.mode = screen.to_string();
-        self.room = backend.get_current_room().to_string();
-        self.unread = backend.get_current_room().get_unread();
+        self.room = backend.get_room(current_room).to_string();
+        self.unread = backend.get_room(current_room).get_unread();
         let unread_array: Vec<String> = backend
             .get_unread_rooms()
             .iter()
@@ -137,10 +143,10 @@ mod tests {
             .once()
             .return_const(vec![]);
         mock_nc_backend
-            .expect_get_current_room()
+            .expect_get_room()
             .times(2)
             .return_const(mock_room);
-        bar.update(CurrentScreen::Reading, &mock_nc_backend);
+        bar.update(CurrentScreen::Reading, &mock_nc_backend, &"123".to_string());
 
         terminal
             .draw(|frame| bar.render_area(frame, Rect::new(0, 0, 30, 3)))
