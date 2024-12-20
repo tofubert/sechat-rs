@@ -6,8 +6,8 @@ use tokio::sync::{
 use crate::config::Config;
 use async_trait::async_trait;
 
-use std::fmt::Debug;
 use std::{error::Error, fmt};
+use std::{fmt::Debug, sync::Arc};
 
 #[cfg(test)]
 use mockall::{mock, predicate::*};
@@ -17,40 +17,22 @@ use super::{
     NCReqDataUser, Token,
 };
 
+type ApiResult<T> =
+    Result<oneshot::Receiver<Result<T, Arc<dyn Error + Send + Sync>>>, Box<dyn Error>>;
+type ApiResponseChannel<T> = oneshot::Sender<Result<T, Arc<dyn Error + Send + Sync>>>;
+
 #[derive(Default, Debug)]
 pub enum ApiRequests {
     #[default]
     None,
-    SendMessage(
-        Token,
-        String,
-        oneshot::Sender<Result<NCReqDataMessage, Box<dyn Error>>>,
-    ),
-    FetchRoomsInitial(oneshot::Sender<Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>>),
-    FetchRoomsUpdate(
-        i64,
-        oneshot::Sender<Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>>,
-    ),
-    FetchParticipants(
-        Token,
-        oneshot::Sender<Result<Vec<NCReqDataParticipants>, Box<dyn Error>>>,
-    ),
-    FetchChatInitial(
-        Token,
-        i32,
-        oneshot::Sender<Result<Vec<NCReqDataMessage>, Box<dyn Error>>>,
-    ),
-    FetchChatUpdate(
-        Token,
-        i32,
-        i32,
-        oneshot::Sender<Result<Vec<NCReqDataMessage>, Box<dyn Error>>>,
-    ),
-    FetchAutocompleteUsers(
-        String,
-        oneshot::Sender<Result<Vec<NCReqDataUser>, Box<dyn Error>>>,
-    ),
-    MarkChatRead(Token, i32, oneshot::Sender<Result<(), Box<dyn Error>>>),
+    SendMessage(Token, String, ApiResponseChannel<NCReqDataMessage>),
+    FetchRoomsInitial(ApiResponseChannel<(Vec<NCReqDataRoom>, i64)>),
+    FetchRoomsUpdate(i64, ApiResponseChannel<(Vec<NCReqDataRoom>, i64)>),
+    FetchParticipants(Token, ApiResponseChannel<Vec<NCReqDataParticipants>>),
+    FetchChatInitial(Token, i32, ApiResponseChannel<Vec<NCReqDataMessage>>),
+    FetchChatUpdate(Token, i32, i32, ApiResponseChannel<Vec<NCReqDataMessage>>),
+    FetchAutocompleteUsers(String, ApiResponseChannel<Vec<NCReqDataUser>>),
+    MarkChatRead(Token, i32, ApiResponseChannel<()>),
 }
 
 impl fmt::Display for ApiRequests {
@@ -76,9 +58,6 @@ impl fmt::Display for ApiRequests {
         }
     }
 }
-
-type ApiResult<T> =
-    Result<tokio::sync::oneshot::Receiver<Result<T, Box<dyn Error>>>, Box<dyn Error>>;
 
 #[async_trait]
 pub trait NCRequestInterface: Debug + Send + Send + Sync {
@@ -180,7 +159,7 @@ impl NCRequest {
 
             tokio::spawn(async move {
                 loop {
-                    if let Ok(req) = rx_worker.recv().await {
+                    if let Some(req) = rx_worker.recv().await {
                         NCRequest::handle_req(&worker, req).await;
                     };
                 }
@@ -279,7 +258,11 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
-    async fn request_chat_initial(&self, token: &Token, maxMessage: i32) -> ApiResult<()> {
+    async fn request_chat_initial(
+        &self,
+        token: &Token,
+        maxMessage: i32,
+    ) -> ApiResult<Vec<NCReqDataMessage>> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx
@@ -307,11 +290,7 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
-    async fn request_mark_chat_read(
-        &self,
-        token: &str,
-        last_message: i32,
-    ) -> Result<oneshot::Receiver<Option<()>>, Box<dyn Error>> {
+    async fn request_mark_chat_read(&self, token: &str, last_message: i32) -> ApiResult<()> {
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.request_tx

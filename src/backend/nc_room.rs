@@ -139,8 +139,7 @@ impl NCRoom {
         let response = response_onceshot
             .await
             .expect("Failed for fetch chat update")
-            .ok_or("Failed request")
-            .unwrap();
+            .expect("Failed request");
         for message in response {
             messages.push(message.into());
         }
@@ -269,8 +268,8 @@ impl NCRoomInterface for NCRoom {
             .await
             .expect("Failed for fetch chat participants");
         match response {
-            Some(v) => Ok(v.message),
-            None => Err("Failed to Send Message".into()),
+            Ok(v) => Ok(v.message),
+            Err(why) => Err(why.into()),
         }
     }
 
@@ -297,8 +296,7 @@ impl NCRoomInterface for NCRoom {
         let response = response_onceshot
             .await
             .expect("Failed for fetch chat update")
-            .ok_or("Failed request")
-            .unwrap();
+            .expect("Failed request");
 
         let is_empty = response.is_empty();
         let update_info = Some((self.room_data.displayName.clone(), response.len()));
@@ -325,8 +323,7 @@ impl NCRoomInterface for NCRoom {
         self.participants = response_onceshot
             .await
             .expect("Failed for fetch chat participants")
-            .ok_or("Failed request")
-            .unwrap();
+            .expect("Failed request");
         if self.has_unread() && !is_empty {
             Ok(update_info)
         } else {
@@ -352,8 +349,7 @@ impl NCRoomInterface for NCRoom {
             response_onceshot
                 .await
                 .expect("Failed for fetch chat participants")
-                .ok_or("Failed request")
-                .unwrap();
+                .expect("Failed request");
         }
         Ok(())
     }

@@ -156,8 +156,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
         let (response, last_requested) = resp
             .await
             .expect("Initial fetching of rooms failed.")
-            .ok_or("No rooms found")
-            .expect("No rooms");
+            .expect("No rooms found");
         log::debug!("Parsing initial Rooms List");
 
         let mut initial_message_ids: HashMap<Token, &NCReqDataRoom> = response
@@ -380,8 +379,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             };
             resp.await
                 .expect("Initial fetching of rooms failed.")
-                .ok_or("No rooms found")
-                .expect("No rooms")
+                .expect("No rooms found")
         } else {
             let resp = {
                 self.requester
@@ -393,8 +391,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             };
             resp.await
                 .expect("Initial fetching of rooms failed.")
-                .ok_or("No rooms found")
-                .expect("No rooms")
+                .expect("No rooms found")
         };
         self.last_requested = timestamp;
         let mut new_room_token: Vec<String> = vec![];
@@ -513,7 +510,7 @@ mod tests {
             roomtype: 2, // Group Chat
             ..Default::default()
         };
-        tx.send(Some((vec![default_room], 1)))
+        tx.send(Ok((vec![default_room], 1)))
             .expect("Sending Failed.");
 
         let default_message = NCReqDataMessage {
@@ -523,7 +520,7 @@ mod tests {
         };
 
         chat_tx
-            .send(Some(vec![default_message.clone()]))
+            .send(Ok(vec![default_message.clone()]))
             .expect("Sending Failed.");
 
         let update_message = NCReqDataMessage {
@@ -532,11 +529,11 @@ mod tests {
             ..Default::default()
         };
         update_tx
-            .send(Some(vec![update_message.clone()]))
+            .send(Ok(vec![update_message.clone()]))
             .expect("Sending Failed.");
 
         pat_tx
-            .send(Some(vec![NCReqDataParticipants::default()]))
+            .send(Ok(vec![NCReqDataParticipants::default()]))
             .expect("Sending Failed.");
 
         mock_requester
@@ -605,32 +602,32 @@ mod tests {
 
         let mut seq = Sequence::new();
 
-        tx.send(Some((vec![default_room.clone()], 1)))
+        tx.send(Ok((vec![default_room.clone()], 1)))
             .expect("Sending Failed.");
-        tx2.send(Some((vec![default_room.clone()], 1)))
+        tx2.send(Ok((vec![default_room.clone()], 1)))
             .expect("Sending Failed.");
 
         chat_tx
-            .send(Some(vec![default_message.clone()]))
+            .send(Ok(vec![default_message.clone()]))
             .expect("Sending Failed.");
 
         update_tx
-            .send(Some(vec![update_message.clone()]))
+            .send(Ok(vec![update_message.clone()]))
             .expect("Sending Failed.");
 
         pat_tx
-            .send(Some(vec![NCReqDataParticipants::default()]))
+            .send(Ok(vec![NCReqDataParticipants::default()]))
             .expect("Sending Failed.");
         pat2_tx
-            .send(Some(vec![NCReqDataParticipants::default()]))
+            .send(Ok(vec![NCReqDataParticipants::default()]))
             .expect("Sending Failed.");
 
         send_tx
-            .send(Some(NCReqDataMessage::default()))
+            .send(Ok(NCReqDataMessage::default()))
             .expect("Sending Failed");
 
         chat_update_tx
-            .send(Some(vec![post_send_message.clone()]))
+            .send(Ok(vec![post_send_message.clone()]))
             .expect("Failed to send");
 
         mock_requester
@@ -728,7 +725,7 @@ mod tests {
             roomtype: 2, // Group Chat
             ..Default::default()
         };
-        tx.send(Some((vec![default_room], 1)))
+        tx.send(Ok((vec![default_room], 1)))
             .expect("Sending Failed.");
 
         let default_message = NCReqDataMessage {
@@ -738,7 +735,7 @@ mod tests {
         };
 
         chat_tx
-            .send(Some(vec![default_message.clone()]))
+            .send(Ok(vec![default_message.clone()]))
             .expect("Sending Failed.");
 
         let update_message = NCReqDataMessage {
@@ -747,11 +744,11 @@ mod tests {
             ..Default::default()
         };
         update_tx
-            .send(Some(vec![update_message.clone()]))
+            .send(Ok(vec![update_message.clone()]))
             .expect("Sending Failed.");
 
         pat_tx
-            .send(Some(vec![NCReqDataParticipants::default()]))
+            .send(Ok(vec![NCReqDataParticipants::default()]))
             .expect("Sending Failed.");
 
         mock_requester
