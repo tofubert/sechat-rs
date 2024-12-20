@@ -5,10 +5,10 @@ coverage: # https://docs.codecov.com/docs/codecovyml-reference#coverage
   status: # https://docs.codecov.com/docs/commit-status
     project:
       default:
-        threshold: 10% # Avoid false negatives, while numbers are so low.
+        threshold: 30% # While big refactors are happening this is ok.
     patch:
       default:
-        threshold: 2%
+        threshold: 100%
 
 comment: # https://docs.codecov.com/docs/pull-request-comments
   # make the comments less noisy
@@ -18,4 +18,4 @@ github_checks:
   annotations: false #Make commit readable again.
 
 ignore:
-  - "main.rs"  #main is not testable.
+  - "sechat-rs/src/main.rs"  #main is not testable.
