@@ -87,3 +87,21 @@ impl NotifyWrapper {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config::init;
+
+    use super::NotifyWrapper;
+
+    #[test]
+    fn create_backend() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+        let notify = NotifyWrapper::new(&config);
+        assert!(!notify.is_persistent());
+        assert!(notify.unread_message(&"Butz".to_string(), 2).is_ok());
+    }
+}
