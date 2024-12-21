@@ -90,18 +90,21 @@ impl NotifyWrapper {
 
 #[cfg(test)]
 mod tests {
+
     use crate::config::init;
 
     use super::NotifyWrapper;
 
+    /// We cannot test the actual notifications.
     #[test]
-    fn create_backend() {
+    fn create_notify() {
         let dir = tempfile::tempdir().unwrap();
 
         std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
         let notify = NotifyWrapper::new(&config);
         assert!(!notify.is_persistent());
-        assert!(notify.unread_message(&"Butz".to_string(), 2).is_ok());
+        assert!(notify.maybe_notify_new_message(None).is_ok());
+        assert!(notify.maybe_notify_new_rooms(vec![]).is_ok());
     }
 }
