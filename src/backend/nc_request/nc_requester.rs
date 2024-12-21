@@ -13,8 +13,8 @@ use std::{fmt::Debug, sync::Arc};
 use mockall::{mock, predicate::*};
 
 use super::{
-    nc_req_worker::NCRequestWorker, NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom,
-    NCReqDataUser, Token,
+    nc_req_worker::{NCRequestWorker, NCRequestWorkerInterface},
+    NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCReqDataUser, Token,
 };
 
 type ApiResult<T> =
@@ -155,7 +155,7 @@ impl NCRequest {
             let (tx_worker, mut rx_worker) = mpsc::channel::<ApiRequests>(10);
 
             worker_queue.push(tx_worker);
-            let worker = NCRequestWorker::new(config).unwrap();
+            let worker = NCRequestWorker::new(config).expect("Failed to create worker.");
 
             tokio::spawn(async move {
                 loop {
@@ -339,5 +339,23 @@ mock! {
     }
     impl Clone for NCRequest {   // specification of the trait to mock
         fn clone(&self) -> Self;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::config::init;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn create() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+
+        let requester = NCRequest::new(&config);
     }
 }

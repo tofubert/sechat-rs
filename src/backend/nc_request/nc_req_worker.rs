@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 use crate::config::Config;
+use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
 use reqwest::{
@@ -24,49 +25,43 @@ pub struct NCRequestWorker {
     json_dump_path: Option<std::path::PathBuf>,
 }
 
+#[async_trait]
+pub trait NCRequestWorkerInterface: Debug + Send + Send + Sync + Sized {
+    fn new(config: &Config) -> Result<Self, Box<dyn Error>>;
+    async fn mark_chat_read(&self, token: &str, last_message: i32) -> Result<(), Box<dyn Error>>;
+    async fn send_message(
+        &self,
+        message: String,
+        token: &Token,
+    ) -> Result<NCReqDataMessage, Box<dyn Error>>;
+    async fn fetch_autocomplete_users(
+        &self,
+        name: &str,
+    ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>>;
+    async fn fetch_participants(
+        &self,
+        token: &Token,
+    ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>>;
+    async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+
+    async fn fetch_rooms_update(
+        &self,
+        last_timestamp: i64,
+    ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+    async fn fetch_chat_initial(
+        &self,
+        token: &Token,
+        maxMessage: i32,
+    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+    async fn fetch_chat_update(
+        &self,
+        token: &Token,
+        maxMessage: i32,
+        last_message: i32,
+    ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+}
+
 impl NCRequestWorker {
-    pub fn new(config: &Config) -> Result<NCRequestWorker, Box<dyn Error>> {
-        use std::io::Write;
-
-        let general = &config.data.general;
-
-        let username = general.user.clone();
-        let password = Some(general.app_pw.clone());
-        let base_url = general.url.clone();
-
-        let json_dump_path = config.get_http_dump_dir();
-        let mut headers = HeaderMap::new();
-        headers.insert("OCS-APIRequest", HeaderValue::from_static("true"));
-        headers.insert("Accept", HeaderValue::from_static("application/json"));
-
-        let mut buf = b"Basic ".to_vec();
-        {
-            let mut encoder = EncoderWriter::new(&mut buf, &BASE64_STANDARD);
-            write!(encoder, "{username}:").expect("i/o error");
-            if let Some(password) = password {
-                write!(encoder, "{password}").expect("i/o error");
-            }
-        }
-        let mut auth_value =
-            HeaderValue::from_bytes(&buf).expect("base64 is always valid HeaderValue");
-        auth_value.set_sensitive(true);
-        headers.insert(AUTHORIZATION, auth_value);
-
-        // get a client builder
-        let client = reqwest::Client::builder()
-            .default_headers(headers.clone())
-            .build()?;
-
-        log::info!("Worker Ready {}", base_url.to_string());
-
-        Ok(NCRequestWorker {
-            base_url: base_url.to_string(),
-            client,
-            base_headers: headers,
-            json_dump_path,
-        })
-    }
-
     async fn request_rooms(
         &self,
         last_timestamp: Option<i64>,
@@ -184,8 +179,53 @@ impl NCRequestWorker {
         }
         Ok(())
     }
+}
 
-    pub async fn send_message(
+#[async_trait]
+impl NCRequestWorkerInterface for NCRequestWorker {
+    fn new(config: &Config) -> Result<NCRequestWorker, Box<dyn Error>> {
+        use std::io::Write;
+
+        let general = &config.data.general;
+
+        let username = general.user.clone();
+        let password = Some(general.app_pw.clone());
+        let base_url = general.url.clone();
+
+        let json_dump_path = config.get_http_dump_dir();
+        let mut headers = HeaderMap::new();
+        headers.insert("OCS-APIRequest", HeaderValue::from_static("true"));
+        headers.insert("Accept", HeaderValue::from_static("application/json"));
+
+        let mut buf = b"Basic ".to_vec();
+        {
+            let mut encoder = EncoderWriter::new(&mut buf, &BASE64_STANDARD);
+            write!(encoder, "{username}:").expect("i/o error");
+            if let Some(password) = password {
+                write!(encoder, "{password}").expect("i/o error");
+            }
+        }
+        let mut auth_value =
+            HeaderValue::from_bytes(&buf).expect("base64 is always valid HeaderValue");
+        auth_value.set_sensitive(true);
+        headers.insert(AUTHORIZATION, auth_value);
+
+        // get a client builder
+        let client = reqwest::Client::builder()
+            .default_headers(headers.clone())
+            .build()?;
+
+        log::info!("Worker Ready {}", base_url.to_string());
+
+        Ok(NCRequestWorker {
+            base_url: base_url.to_string(),
+            client,
+            base_headers: headers,
+            json_dump_path,
+        })
+    }
+
+    async fn send_message(
         &self,
         message: String,
         token: &Token,
@@ -210,7 +250,7 @@ impl NCRequestWorker {
         }
     }
 
-    pub async fn fetch_autocomplete_users(
+    async fn fetch_autocomplete_users(
         &self,
         name: &str,
     ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>> {
@@ -240,7 +280,7 @@ impl NCRequestWorker {
         }
     }
 
-    pub async fn fetch_participants(
+    async fn fetch_participants(
         &self,
         token: &Token,
     ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>> {
@@ -273,18 +313,18 @@ impl NCRequestWorker {
         }
     }
 
-    pub async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
+    async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
         self.request_rooms(None).await
     }
 
-    pub async fn fetch_rooms_update(
+    async fn fetch_rooms_update(
         &self,
         last_timestamp: i64,
     ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>> {
         self.request_rooms(Some(last_timestamp)).await
     }
 
-    pub async fn fetch_chat_initial(
+    async fn fetch_chat_initial(
         &self,
         token: &Token,
         maxMessage: i32,
@@ -301,7 +341,7 @@ impl NCRequestWorker {
         }
     }
 
-    pub async fn fetch_chat_update(
+    async fn fetch_chat_update(
         &self,
         token: &Token,
         maxMessage: i32,
@@ -317,11 +357,7 @@ impl NCRequestWorker {
         }
     }
 
-    pub async fn mark_chat_read(
-        &self,
-        token: &str,
-        last_message: i32,
-    ) -> Result<(), Box<dyn Error>> {
+    async fn mark_chat_read(&self, token: &str, last_message: i32) -> Result<(), Box<dyn Error>> {
         let url_string =
             self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token + "/read";
         let url = Url::parse(&url_string)?;
@@ -336,6 +372,51 @@ impl NCRequestWorker {
                     .ok_or("Failed to convert Error")?,
             )),
         }
+    }
+}
+
+#[cfg(test)]
+use mockall::{mock, predicate::*};
+
+#[cfg(test)]
+mock! {
+    #[derive(Debug)]
+    pub NCRequestWorker{
+    }
+    #[async_trait]
+    impl NCRequestWorkerInterface for NCRequestWorker{
+        fn new(config: &Config) -> Result<Self, Box<dyn Error>>;
+        async fn mark_chat_read(&self, token: &str, last_message: i32) -> Result<(), Box<dyn Error>>;
+        async fn send_message(
+            &self,
+            message: String,
+            token: &Token,
+        ) -> Result<NCReqDataMessage, Box<dyn Error>>;
+        async fn fetch_autocomplete_users(
+            &self,
+            name: &str,
+        ) -> Result<Vec<NCReqDataUser>, Box<dyn Error>>;
+        async fn fetch_participants(
+            &self,
+            token: &Token,
+        ) -> Result<Vec<NCReqDataParticipants>, Box<dyn Error>>;
+        async fn fetch_rooms_initial(&self) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+
+        async fn fetch_rooms_update(
+            &self,
+            last_timestamp: i64,
+        ) -> Result<(Vec<NCReqDataRoom>, i64), Box<dyn Error>>;
+        async fn fetch_chat_initial(
+            &self,
+            token: &Token,
+            maxMessage: i32,
+        ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+        async fn fetch_chat_update(
+            &self,
+            token: &Token,
+            maxMessage: i32,
+            last_message: i32,
+        ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
     }
 }
 
