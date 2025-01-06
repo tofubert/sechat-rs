@@ -32,7 +32,7 @@ use super::{
 /// This trait is needed due to the use of the [`mockall`] crate in testing.
 /// See [`backend::nc_talk::NCTalk`] for more details on the functionality.
 #[async_trait]
-    /// Trait for the NC Talk Room representation.
+/// Trait for the NC Talk Room representation.
 pub trait NCBackend: Debug + Send {
     type Room: NCRoomInterface;
     /// Write all log files for this NC Instance to disk.
