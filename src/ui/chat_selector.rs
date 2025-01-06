@@ -33,7 +33,7 @@ impl ChatSelector<'_> {
                         .iter()
                         .map(|token| {
                             TreeItem::new_leaf::<String>(
-                                token.clone(),
+                                token.to_string(),
                                 backend.get_room(token).get_display_name().into(),
                             )
                         })
@@ -47,7 +47,7 @@ impl ChatSelector<'_> {
                         .get_dm_keys_display_name_mapping()
                         .iter()
                         .map(|(token, display_name)| {
-                            TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
+                            TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
                         })
                         .collect_vec(),
                 )
@@ -59,7 +59,7 @@ impl ChatSelector<'_> {
                         .get_group_keys_display_name_mapping()
                         .iter()
                         .map(|(token, display_name)| {
-                            TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
+                            TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
                         })
                         .collect_vec(),
                 )
@@ -80,7 +80,7 @@ impl ChatSelector<'_> {
                     .iter()
                     .map(|token| {
                         TreeItem::new_leaf::<String>(
-                            token.clone(),
+                            token.to_string(),
                             backend.get_room(token).get_display_name().into(),
                         )
                     })
@@ -93,7 +93,7 @@ impl ChatSelector<'_> {
                     .get_dm_keys_display_name_mapping()
                     .iter()
                     .map(|(token, display_name)| {
-                        TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
+                        TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
                     })
                     .collect_vec(),
             )?,
@@ -104,7 +104,7 @@ impl ChatSelector<'_> {
                     .get_group_keys_display_name_mapping()
                     .iter()
                     .map(|(token, display_name)| {
-                        TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
+                        TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
                     })
                     .collect_vec(),
             )?,
@@ -132,7 +132,7 @@ impl ChatSelector<'_> {
 #[cfg(test)]
 mod tests {
 
-    use crate::backend::nc_request::NCReqDataParticipants;
+    use crate::backend::nc_request::{NCReqDataParticipants, Token};
     use crate::backend::nc_room::MockNCRoomInterface;
     use crate::backend::nc_talk::MockNCTalk;
     use crate::config::init;
@@ -177,7 +177,7 @@ mod tests {
             .expect_get_unread_rooms()
             .once()
             .in_sequence(&mut seq)
-            .return_const(vec!["0".to_string()]);
+            .return_const(vec![Token::from("0")]);
 
         mock_room
             .expect_get_display_name()
@@ -186,7 +186,7 @@ mod tests {
 
         mock_nc_backend
             .expect_get_room()
-            .with(eq("0".to_string()))
+            .with(eq(Token::from("0")))
             .once()
             .in_sequence(&mut seq)
             .return_const(mock_room);
@@ -195,13 +195,13 @@ mod tests {
             .expect_get_dm_keys_display_name_mapping()
             .once()
             .in_sequence(&mut seq)
-            .return_const(vec![("Butz".to_string(), "1".to_string())]);
+            .return_const(vec![(Token::from("Butz"), "1".to_string())]);
 
         mock_nc_backend
             .expect_get_group_keys_display_name_mapping()
             .once()
             .in_sequence(&mut seq)
-            .return_const(vec![("Bert".to_string(), "2".to_string())]);
+            .return_const(vec![(Token::from("Bert"), "2".to_string())]);
 
         let mut chat_selector_box = ChatSelector::new(&mock_nc_backend, &config);
 
