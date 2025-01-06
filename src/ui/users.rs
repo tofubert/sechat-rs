@@ -6,7 +6,7 @@ use ratatui::{
 };
 use style::Styled;
 
-use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
+use crate::backend::{nc_request::Token, nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
 
 pub struct Users<'a> {
@@ -36,9 +36,9 @@ impl Users<'_> {
     pub fn render_area(&self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(self, area, &mut self.state.clone());
     }
-    pub fn update(&mut self, backend: &impl NCBackend) {
+    pub fn update(&mut self, backend: &impl NCBackend, current_room: &Token) {
         self.user_list = backend
-            .get_current_room()
+            .get_room(current_room)
             .get_users()
             .iter()
             .sorted_by(|user1, user2| user1.displayName.cmp(&user2.displayName))
@@ -114,10 +114,10 @@ mod tests {
         dummy_user.displayName = "Butz".to_string();
         mock_room.expect_get_users().return_const(vec![dummy_user]);
         mock_nc_backend
-            .expect_get_current_room()
+            .expect_get_room()
             .once()
             .return_const(mock_room);
-        users.update(&mock_nc_backend);
+        users.update(&mock_nc_backend, &"123".to_string());
 
         terminal
             .draw(|frame| users.render_area(frame, Rect::new(0, 0, 8, 8)))

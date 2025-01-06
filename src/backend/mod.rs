@@ -2,8 +2,6 @@
 
 /// NC Talk Message Object
 pub mod nc_message;
-/// Dbus Notification Client
-pub mod nc_notify;
 /// NC Talk API Wrapper
 pub mod nc_request;
 /// NC Talk Room Object
