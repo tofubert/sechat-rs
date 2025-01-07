@@ -13,72 +13,111 @@ use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// Different Types of rooms defined by the [NC API](https://nextcloud-talk.readthedocs.io/en/latest/constants/#conversation-types)
 #[derive(Debug, FromPrimitive, PartialEq, Default)]
 pub enum NCRoomTypes {
+    /// DM
     #[default]
     OneToOne = 1,
+    /// Group Chat
     Group,
+    /// Public Channel
     Public,
+    /// NC API Change Log
     ChangeLog,
+    /// Old One to One
     Deprecated,
+    /// Talk to yourself
     NoteToSelf,
 }
 
 #[cfg(test)]
 use mockall::{automock, predicate::*};
 
+/// Room Interface Trait
+/// Holds all public functions for operations on NC Talk Rooms. For details see [NCRoom].
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
+    /// Get the ID of the last message of this Room.
+    /// This is filtered to not include reactions and deleted messages.
     fn get_last_room_level_message_id(&self) -> Option<i32>;
+    /// Check if this Room has unread messages.
     fn has_unread(&self) -> bool;
+    /// Check if this Room is a DM Room.
     #[allow(dead_code)]
     fn is_dm(&self) -> bool;
+    /// Check if this Room is a Group Chat.
     fn is_group(&self) -> bool;
+    /// Get a Vector of all the messages in the room.
     fn get_messages(&self) -> &Vec<NCMessage>;
+    /// Get how many messages are unread.
     fn get_unread(&self) -> usize;
+    /// Get the human readable display name of the room.
     fn get_display_name(&self) -> &str;
+    /// Get the if of the last read messages.
     fn get_last_read(&self) -> i32;
+    /// Get a Vector of the users in the Room.
     fn get_users(&self) -> &Vec<NCReqDataParticipants>;
+    /// Get the room type.
     fn get_room_type(&self) -> &NCRoomTypes;
 
+    /// Make this room a json object which can be serialised.
     #[allow(dead_code)]
     fn to_json(&self) -> String;
+    /// Get the Underlying Data Object of this Room.
     fn to_data(&self) -> NCReqDataRoom;
+    /// Write this room into a log file.
     fn write_to_log(&mut self) -> Result<(), std::io::Error>;
+    /// Get the rooms token.
     fn to_token(&self) -> Token;
+    /// Check if the message ID is newer than the stored one and update the content.
+    /// This is needed since the NCTalk will fetch all rooms and only get the overview data.
     async fn update_if_id_is_newer<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         message_id: i32,
         data_option: Option<NCReqDataRoom>,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    /// Send a Message to this room.
     async fn send<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
         message: String,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<String, Box<dyn std::error::Error>>;
+    /// Update this Room.
     async fn update<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         data_option: Option<NCReqDataRoom>,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<Option<(String, usize)>, Box<dyn std::error::Error>>;
+    /// Marks this Room as read.
     async fn mark_as_read<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &self,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
+/// Real implementation of the NCRoom.
+/// Holds its Messages, Participants, Raw Data and Path to write its log to.
 #[derive(Debug, Default)]
 pub struct NCRoom {
+    /// Vector of all its messages.
     pub messages: Vec<NCMessage>,
+    /// Raw Data of this Room.
     room_data: NCReqDataRoom,
+    /// Path to write json output to.
     path_to_log: std::path::PathBuf,
+    /// Type of this Room.
     pub room_type: NCRoomTypes,
+    /// Vec of all Participants in this Room.
     participants: Vec<NCReqDataParticipants>,
 }
 
 impl NCRoom {
+    /// Create a new NCRoom.
+    /// Tries to read chat data from the disk, else fetches it.
+    /// Requester is in a Thread safe Arc/Mutex.
     pub async fn new<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         room_data: NCReqDataRoom,
         requester: Arc<Mutex<Requester>>,

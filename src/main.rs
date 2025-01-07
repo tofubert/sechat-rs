@@ -55,11 +55,11 @@
 //! With the config read the [`backend::nc_talk::NCTalk`] is created, which first tries to read old chat logs from disk, and the fetches updates from the server.
 //! Note: Currently gaps in the chat history are not filled automatically.
 //! The `NCTalk` instance is holding a list of all [`backend::nc_room::NCRoom`]s.
-//! [`backend::nc_request::NCRequest`] is the actual API Requester, which will call to the server and Parse the Response Objects.
+//! [`backend::nc_request::nc_requester::NCRequest`] is the thread handler for the API Requests and NCRequestWorker does the actual request work to the API.
 //! Responses are parsed using [`serde`] and various structs in [`backend::nc_request`].
 //!
 //! ### UI
-//! The backend is then passed into [`ui::run`] which starts the UI and holds the main event loop.
+//! The backend is then passed into a [`ui::app::App`] object and run is called which starts the UI and holds the main event loop.
 //! Ether a [`crossterm::event::KeyEvent`] or the rendering timeout lead to a refresh of the UI.
 //! The UI uses the [`ui::app::App`] struct to orchestrate all the UIs Widgets.
 //!

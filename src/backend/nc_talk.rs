@@ -29,11 +29,12 @@ use super::{
 
 /// Public Trait for NC Talk Instance Object used for all interaction with the server.
 ///
-/// This trait is needed due to the use of the [`mockall`] crate in testing.
-/// See [`backend::nc_talk::NCTalk`] for more details on the functionality.
+/// This trait is needed due to the use of the [mockall](https://crates.io/crates/mockall) crate in testing.
+/// See [`NCTalk`] for more details on the functionality.
 #[async_trait]
-/// Trait for the NC Talk Room representation.
 pub trait NCBackend: Debug + Send {
+    /// Type for Rooms used in Backend.
+    /// Since this ether can be a mock or a real room, it need to be named here.
     type Room: NCRoomInterface;
     /// Write all log files for this NC Instance to disk.
     /// # Errors
@@ -65,6 +66,8 @@ pub trait NCBackend: Debug + Send {
     /// Check with the Server for all Rooms if updates happened.
     /// ```force_update``` will force the currently stored Room data to be overwritten.
     async fn update_rooms(&mut self, force_update: bool) -> Result<Vec<String>, Box<dyn Error>>;
+    /// Mark the room identified by the Token as read.
+    /// Does not need to be the current Room, but usually is.
     async fn mark_current_room_as_read(
         &self,
         token: &Token,
@@ -73,8 +76,7 @@ pub trait NCBackend: Debug + Send {
 
 /// NC Talk instance reprensation for all interactions with Server.
 ///
-/// This struct stores all Rooms in a Hashmap, holds the dbus notifyer and the API Wrapper.
-/// It also keeps track of the current room in focus. Which is needed for
+/// This struct stores all Rooms in a Hashmap and the API Wrapper.
 #[derive(Debug, Default)]
 pub struct NCTalk<Requester: NCRequestInterface + 'static + std::marker::Sync> {
     rooms: HashMap<Token, NCRoom>,

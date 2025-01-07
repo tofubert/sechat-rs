@@ -1,3 +1,4 @@
+//! The Requester is the Sechat facing Abstraction of the NC API.
 use tokio::sync::{
     mpsc::{self, Sender},
     oneshot,
@@ -87,6 +88,11 @@ pub trait NCRequestInterface: Debug + Send + Send + Sync {
     async fn request_mark_chat_read(&self, token: &str, last_message: i32) -> ApiResult<()>;
 }
 
+/// The [NCRequest] uses a number of Threads to distribute the Requests to the Workers.
+///
+/// To Communicate with the Threads a List of [tokio::sync::mpsc] channels is used.
+/// The Threads get passed a [ApiRequests] with Response Channel as a payload.
+/// A User of this API can then Poll on the [ApiResponseChannel]
 #[derive(Debug)]
 pub struct NCRequest {
     request_tx: Sender<ApiRequests>,
