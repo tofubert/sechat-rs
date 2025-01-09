@@ -44,6 +44,8 @@ pub trait NCBackend: Debug + Send {
     fn get_room(&self, token: &Token) -> &Self::Room;
     /// Get a list of tokens of rooms with unread messages.
     fn get_unread_rooms(&self) -> Vec<Token>;
+    /// Get a list of tokens of favorite rooms.
+    fn get_favorite_rooms(&self) -> Vec<Token>;
     /// Get a room token by its Displayname.
     fn get_room_by_displayname(&self, name: &str) -> Token;
     /// Get a list of direct messages rooms as token, displayname pairs.
@@ -337,6 +339,15 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             .collect::<Vec<Token>>()
     }
 
+    fn get_favorite_rooms(&self) -> Vec<Token> {
+        self.rooms
+            .values()
+            .filter(|room| room.is_favorite())
+            .sorted()
+            .map(NCRoomInterface::to_token)
+            .collect()
+    }
+
     fn get_room_by_displayname(&self, name: &str) -> Token {
         for room in self.rooms.values() {
             if room.to_string() == *name {
@@ -502,6 +513,7 @@ mock! {
         fn write_to_log(&mut self) -> Result<(), std::io::Error>;
         fn get_room(&self, token: &Token) -> &<MockNCTalk as NCBackend>::Room;
         fn get_unread_rooms(&self) -> Vec<Token>;
+        fn get_favorite_rooms(&self) -> Vec<Token>;
         fn get_room_by_displayname(&self, name: &str) -> Token;
         fn get_dm_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
         fn get_group_keys_display_name_mapping(&self) -> Vec<(Token, String)>;

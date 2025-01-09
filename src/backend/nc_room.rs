@@ -53,6 +53,8 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     fn get_messages(&self) -> &Vec<NCMessage>;
     /// Get how many messages are unread.
     fn get_unread(&self) -> usize;
+    /// Check if this Room is a favorite.
+    fn is_favorite(&self) -> bool;
     /// Get the human readable display name of the room.
     fn get_display_name(&self) -> &str;
     /// Get the if of the last read messages.
@@ -229,6 +231,10 @@ impl NCRoomInterface for NCRoom {
 
     fn get_unread(&self) -> usize {
         self.room_data.unreadMessages.as_()
+    }
+
+    fn is_favorite(&self) -> bool {
+        self.room_data.isFavorite
     }
 
     fn get_display_name(&self) -> &str {

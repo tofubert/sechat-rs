@@ -41,6 +41,21 @@ impl ChatSelector<'_> {
                 )
                 .expect("unread duplicate"),
                 TreeItem::new::<String>(
+                    "favorites".to_string(),
+                    "Favorite Chats".to_string(),
+                    backend
+                        .get_favorite_rooms()
+                        .iter()
+                        .map(|token| {
+                            TreeItem::new_leaf::<String>(
+                                token.to_string(),
+                                backend.get_room(token).get_display_name().into(),
+                            )
+                        })
+                        .collect_vec(),
+                )
+                .expect("favorite room name duplicate"),
+                TreeItem::new::<String>(
                     "direct".to_string(),
                     "DMs".to_string(),
                     backend
@@ -77,6 +92,20 @@ impl ChatSelector<'_> {
                 "Unread Chats".to_string(),
                 backend
                     .get_unread_rooms()
+                    .iter()
+                    .map(|token| {
+                        TreeItem::new_leaf::<String>(
+                            token.to_string(),
+                            backend.get_room(token).get_display_name().into(),
+                        )
+                    })
+                    .collect_vec(),
+            )?,
+            TreeItem::new::<String>(
+                "favorites".to_string(),
+                "Favorite Chats".to_string(),
+                backend
+                    .get_favorite_rooms()
                     .iter()
                     .map(|token| {
                         TreeItem::new_leaf::<String>(
@@ -162,6 +191,12 @@ mod tests {
             .return_const(vec![]);
 
         mock_nc_backend
+            .expect_get_favorite_rooms()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![]);
+
+        mock_nc_backend
             .expect_get_dm_keys_display_name_mapping()
             .once()
             .in_sequence(&mut seq)
@@ -192,6 +227,12 @@ mod tests {
             .return_const(mock_room);
 
         mock_nc_backend
+            .expect_get_favorite_rooms()
+            .once()
+            .in_sequence(&mut seq)
+            .return_const(vec![]);
+
+        mock_nc_backend
             .expect_get_dm_keys_display_name_mapping()
             .once()
             .in_sequence(&mut seq)
@@ -215,9 +256,9 @@ mod tests {
         let mut expected = Buffer::with_lines([
             "┌Chat Section──────────────────────────┐",
             "│  Unread Chats                        │",
+            "│  Favorite Chats                      │",
             "│  DMs                                 │",
             "│  Group                               │",
-            "│                                      │",
             "│                                      │",
             "│                                      │",
             "│                                      │",
@@ -241,9 +282,9 @@ mod tests {
             "┌Chat Section──────────────────────────┐",
             "│>> ▼ Unread Chats                     │",
             "│       General                        │",
+            "│     Favorite Chats                   │",
             "│   ▶ DMs                              │",
             "│   ▶ Group                            │",
-            "│                                      │",
             "│                                      │",
             "│                                      │",
             "│                                      │",
