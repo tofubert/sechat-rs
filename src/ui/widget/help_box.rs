@@ -45,6 +45,11 @@ impl Widget for &HelpBox {
                         "enter the editing screen, when in reading mode.",
                     ]),
                     Row::new([
+                        "(u|d)",
+                        "jump scroll",
+                        "scroll up or down the lists in bigger intervals when in opening mode.",
+                    ]),
+                    Row::new([
                         "ESC",
                         "leave Mode",
                         "leave help, opening, or editing mode to return to reading mode",
@@ -108,9 +113,9 @@ mod tests {
             "?     help                 enter this he",
             "m     mark as read         mark current ",
             "(e|i) edit                 enter the edi",
+            "(u|d) jump scroll          scroll up or ",
             "ESC   leave Mode           leave help, o",
             "Enter send/select          Send Message,",
-            "                                        ",
         ]);
         expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
 
