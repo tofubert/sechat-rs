@@ -12,6 +12,12 @@ use style::Styled;
 
 pub struct TitleBar<'a> {
     room: String,
+    status: Option<String>,
+    status_text: Option<String>,
+    user_away_style: Style,
+    user_dnd_style: Style,
+    user_online_style: Style,
+    user_offline_style: Style,
     mode: String,
     unread: usize,
     unread_rooms: Text<'a>,
@@ -24,6 +30,12 @@ impl TitleBar<'_> {
     pub fn new(initial_state: CurrentScreen, room: String, config: &Config) -> Self {
         TitleBar {
             room,
+            status: None,
+            status_text: None,
+            user_away_style: config.theme.user_away_style(),
+            user_dnd_style: config.theme.user_dnd_style(),
+            user_online_style: config.theme.user_online_style(),
+            user_offline_style: config.theme.user_offline_style(),
             mode: initial_state.to_string(),
             unread: 0,
             unread_rooms: Text::raw(""),
@@ -40,7 +52,25 @@ impl TitleBar<'_> {
         current_room: &Token,
     ) {
         self.mode = screen.to_string();
-        self.room = backend.get_room(current_room).to_string();
+        let room = backend.get_room(current_room);
+        self.room = room.to_string();
+        if room.is_dm() {
+            let user = room
+                .get_users()
+                .into_iter()
+                .find(|user| &user.displayName == room.get_display_name());
+            if user.is_none() {
+                log::warn!("Could not find user associated with this DM");
+            }
+            self.status = user.and_then(|user| (&user.status).clone());
+            self.status_text =
+                user.and_then(|user| match (&user.statusIcon, &user.statusMessage) {
+                    (None, None) => None,
+                    (None, Some(msg)) => Some(String::from(msg)),
+                    (Some(icon), None) => Some(String::from(icon)),
+                    (Some(icon), Some(msg)) => Some(String::from(format!("{icon} {msg}"))),
+                });
+        }
         self.unread = backend.get_room(current_room).get_unread();
         let unread_array: Vec<String> = backend
             .get_unread_rooms()
@@ -65,19 +95,41 @@ impl TitleBar<'_> {
 
 impl Widget for &TitleBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let (room_title, room_title_style) = if self.unread > 0 {
-            (
-                format!("Current: {}: {}", self.room, self.unread),
-                self.title_style,
-            )
+        let header = if self.unread > 0 {
+            format!("Current({}): ", self.unread)
         } else {
-            (format!("Current: {}", self.room), self.title_style)
+            String::from("Current: ")
         };
+        let room_style = if let Some(status) = &self.status {
+            match status.as_str() {
+                "away" => self.user_away_style,
+                "offline" => self.user_offline_style,
+                "dnd" => self.user_dnd_style,
+                "online" => self.user_online_style,
+                unknown => {
+                    log::debug!("Unknown Status {unknown}");
+                    self.default_style
+                }
+            }
+        } else {
+            self.title_style
+        };
+        let mut title_length = header.len() + self.room.len();
+        let mut title_spans = vec![
+            Span::styled(header, self.title_style),
+            Span::styled(&self.room, room_style),
+        ];
+
+        if let Some(status_text) = &self.status_text {
+            let status_text = format!(" ({status_text})");
+            title_length += status_text.len();
+            title_spans.push(Span::styled(status_text, self.title_style));
+        }
 
         let title_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Min(room_title.len().as_()),
+                Constraint::Min(title_length.as_()),
                 Constraint::Fill(1),
                 Constraint::Percentage(20),
             ])
@@ -87,7 +139,7 @@ impl Widget for &TitleBar<'_> {
             .borders(Borders::BOTTOM)
             .style(self.default_style);
 
-        Paragraph::new(Text::styled(room_title, room_title_style))
+        Paragraph::new(Line::from(title_spans))
             .block(title_block)
             .render(title_layout[0], buf);
 
@@ -138,6 +190,7 @@ mod tests {
         dummy_user.displayName = "Butz".to_string();
         mock_room.expect_get_users().return_const(vec![dummy_user]);
         mock_room.expect_get_unread().return_const(false);
+        mock_room.expect_is_dm().return_const(false);
         mock_nc_backend
             .expect_get_unread_rooms()
             .once()
