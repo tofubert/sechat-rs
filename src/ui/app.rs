@@ -109,6 +109,9 @@ impl<Backend: NCBackend> App<'_, Backend> {
         // create app and run it
         self.run_app(tui).await?;
 
+        // Kill worker threads.
+        self.backend.shutdown().await?;
+
         restore(config.get_enable_mouse(), config.get_enable_paste())?;
         Ok(())
     }
@@ -340,14 +343,22 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('j') | KeyCode::Down => _ = self.selector.state.key_down(),
             KeyCode::Char('k') | KeyCode::Up => _ = self.selector.state.key_up(),
             KeyCode::Char('l') | KeyCode::Right => _ = self.selector.state.key_right(),
+            KeyCode::Char('d') | KeyCode::PageDown => {
+                _ = self.selector.state.select_relative(|current| {
+                    current.map_or(0, |current| current.saturating_add(9))
+                });
+            }
+            KeyCode::Char('u') | KeyCode::PageUp => {
+                _ = self.selector.state.select_relative(|current| {
+                    current.map_or(0, |current| current.saturating_sub(9))
+                });
+            }
             KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
             KeyCode::Char('?') => self.current_screen = CurrentScreen::Helping,
             KeyCode::Char(' ') => _ = self.selector.state.toggle_selected(),
             KeyCode::Enter => self.select_room().await?,
             KeyCode::Home => _ = self.selector.state.select_first(),
             KeyCode::End => _ = self.selector.state.select_last(),
-            KeyCode::PageDown => _ = self.selector.state.scroll_down(3),
-            KeyCode::PageUp => _ = self.selector.state.scroll_up(3),
             _ => (),
         };
         Ok(())
@@ -366,6 +377,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             } => {
                 // SEND MEssage
                 self.current_screen = CurrentScreen::Reading;
+                self.mark_current_as_read().await?;
                 self.send_message().await?;
             }
             _ => self.new_input_key(key),
