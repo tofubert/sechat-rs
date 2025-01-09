@@ -1,7 +1,12 @@
+//! App holds the main event loop, creates and tears down the ui.
+//!
+//! ### General
+//! The structure of the Frontend takes a lot of inspiration from [crates-tui](https://github.com/ratatui/crates-tui/tree/main).
+//!
 use crate::{
     backend::{nc_request::Token, nc_room::NCRoomInterface, nc_talk::NCBackend},
     config::Config,
-    ui::{
+    ui::widget::{
         chat_box::ChatBox,
         chat_selector::ChatSelector,
         help_box::HelpBox,
