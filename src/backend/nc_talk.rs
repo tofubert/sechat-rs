@@ -72,6 +72,8 @@ pub trait NCBackend: Debug + Send {
         &self,
         token: &Token,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    /// trigger for all threads to be killed.
+    async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 /// NC Talk instance reprensation for all interactions with Server.
@@ -478,6 +480,10 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
     fn get_room(&self, token: &Token) -> &Self::Room {
         &self.rooms[token]
     }
+
+    async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.requester.lock().await.shutdown().await
+    }
 }
 
 #[cfg(test)]
@@ -504,6 +510,7 @@ mock! {
         async fn select_room(&mut self, token: &Token) -> Result<Option<(String, usize)>, Box<dyn Error>>;
         async fn update_rooms(& mut self, force_update: bool) -> Result<Vec<String>, Box<dyn Error>>;
         async fn mark_current_room_as_read(&self, token: &Token) -> Result<(), Box<dyn std::error::Error>>;
+        async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>>;
     }
 }
 

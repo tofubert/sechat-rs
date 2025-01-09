@@ -109,6 +109,9 @@ impl<Backend: NCBackend> App<'_, Backend> {
         // create app and run it
         self.run_app(tui).await?;
 
+        // Kill worker threads.
+        self.backend.shutdown().await?;
+
         restore(config.get_enable_mouse(), config.get_enable_paste())?;
         Ok(())
     }
