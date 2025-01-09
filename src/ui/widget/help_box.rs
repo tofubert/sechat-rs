@@ -9,6 +9,7 @@ pub struct HelpBox {
     default: Style,
     default_highlight: Style,
     table_header: Style,
+    popup_border: Style,
 }
 
 impl HelpBox {
@@ -17,6 +18,7 @@ impl HelpBox {
             default: config.theme.default_style(),
             default_highlight: config.theme.default_highlight_style(),
             table_header: config.theme.table_header_style(),
+            popup_border: config.theme.popup_border_style(),
         }
     }
     pub fn render_area(&self, frame: &mut Frame, area: Rect) {
@@ -69,7 +71,7 @@ impl Widget for &HelpBox {
             .column_spacing(1)
             .style(self.default)
             .header(Row::new(vec!["Key", "Name", "Behavior"]).style(self.table_header))
-            .block(Block::default())
+            .block(Block::bordered().title("Help").border_style(self.popup_border))
             .row_highlight_style(self.default_highlight)
             .highlight_spacing(HighlightSpacing::Never),
             area,
@@ -94,7 +96,7 @@ mod tests {
         std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
 
-        let backend = TestBackend::new(40, 10);
+        let backend = TestBackend::new(40, 12);
         let mut terminal = Terminal::new(backend).unwrap();
         let help_box = HelpBox::new(&config);
 
@@ -102,24 +104,28 @@ mod tests {
         dummy_user.displayName = "Butz".to_string();
 
         terminal
-            .draw(|frame| help_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .draw(|frame| help_box.render_area(frame, Rect::new(0, 0, 40, 12)))
             .unwrap();
 
         let mut expected = Buffer::with_lines([
-            "Key   Name                 Behavior     ",
-            "q     quit                 enter the qui",
-            "o     open                 enter the cha",
-            "u     users sidebar        Toggle whethe",
-            "?     help                 enter this he",
-            "m     mark as read         mark current ",
-            "(e|i) edit                 enter the edi",
-            "(u|d) jump scroll          scroll up or ",
-            "ESC   leave Mode           leave help, o",
-            "Enter send/select          Send Message,",
+            "┌Help──────────────────────────────────┐",
+            "│Key   Name                 Behavior   │",
+            "│q     quit                 enter the q│",
+            "│o     open                 enter the c│",
+            "│u     users sidebar        Toggle whet│",
+            "│?     help                 enter this │",
+            "│m     mark as read         mark curren│",
+            "│(e|i) edit                 enter the e│",
+            "│(u|d) jump scroll          scroll up o│",
+            "│ESC   leave Mode           leave help,│",
+            "│Enter send/select          Send Messag│",
+            "└──────────────────────────────────────┘",
         ]);
-        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+        expected.set_style(Rect::new(0, 0, 40, 12), config.theme.popup_border_style());
 
-        expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
+        expected.set_style(Rect::new(1, 1, 38, 10), config.theme.default_style());
+
+        expected.set_style(Rect::new(1, 1, 38, 1), config.theme.table_header_style());
 
         terminal.backend().assert_buffer(&expected);
     }
