@@ -1,4 +1,5 @@
-//! Sechat-rs Frontend based on [ratatui](https://docs.rs/ratatui/latest/ratatui/index.html)
+//! Sechat-rs Frontend based on [ratatui](https://docs.rs/ratatui/latest/ratatui/index.html). See [``app``] for more info.
 pub mod app;
 pub mod notifications;
+mod terminal_helpers;
 mod widget;

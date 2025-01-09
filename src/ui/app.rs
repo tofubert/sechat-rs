@@ -2,18 +2,26 @@
 //!
 //! ### General
 //! The structure of the Frontend takes a lot of inspiration from [crates-tui](https://github.com/ratatui/crates-tui/tree/main).
+//! The [ratatui Widgets](https://docs.rs/ratatui/latest/ratatui/widgets/trait.Widget.html) in the
+//! [`widget`](crate::ui::widget) module use ratatui widgets as well as the following extra crates:
+//! * [tui-tree-widget](https://github.com/EdJoPaTo/tui-rs-tree-widget)
+//! * [tui-textarea](https://github.com/rhysd/tui-textarea)
 //!
+//! ### Structure
+//! The [`App`] holds all top level state and all objects.
+//! It stores the [``NCTalk``](crate::backend::nc_talk::NCTalk) instance, the [``notification object``](crate::ui::notifications::NotifyWrapper)
+//! and the [``current screen``](crate::ui::app::CurrentScreen).
+//!
+//! The [``run``](crate::ui::app::App::run) method does the ui setup, through the [``init``] function,
+//! and then calls [``run_ui``](crate::ui::app::App::run_app) to execute the main loop.
+//! the main loop ether waits for a key event. Should now event ocure for 3 seconds a update from the remote server is fetched.
 use crate::{
     backend::{nc_request::Token, nc_room::NCRoomInterface, nc_talk::NCBackend},
     config::Config,
+    ui::terminal_helpers::{init, install_hooks, restore},
     ui::widget::{
-        chat_box::ChatBox,
-        chat_selector::ChatSelector,
-        help_box::HelpBox,
-        input_box::InputBox,
-        terminal_helpers::{init, install_hooks, restore},
-        title_bar::TitleBar,
-        users::Users,
+        chat_box::ChatBox, chat_selector::ChatSelector, help_box::HelpBox, input_box::InputBox,
+        title_bar::TitleBar, users::Users,
     },
 };
 use ratatui::{
