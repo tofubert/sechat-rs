@@ -192,6 +192,40 @@ impl NCRoom {
         }
         Ok(())
     }
+
+    async fn fetch_message_subset<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        first: i32,
+        last: i32,
+        requester: Arc<Mutex<Requester>>,
+        token: &Token,
+    ) -> BTreeMap<i32, NCMessage> {
+        let mut fetch_key = first;
+        let mut messages = BTreeMap::new();
+        while fetch_key <= last && fetch_key >= 0 {
+            let response_onceshot = {
+                requester
+                    .lock()
+                    .await
+                    .request_chat_update(token, 200, fetch_key)
+                    .await
+                    .unwrap()
+            };
+            let response = response_onceshot
+                .await
+                .expect("Failed for fetch chat update")
+                .expect("Failed request");
+            if response.is_empty() {
+                log::debug!("No Messages found aborting {}", fetch_key);
+                break;
+            }
+            fetch_key = response.last().expect("No Messages fetched").id;
+
+            for message in response {
+                messages.insert(message.id, message.into());
+            }
+        }
+        messages
+    }
 }
 
 #[async_trait]
@@ -455,7 +489,28 @@ impl NCRoomInterface for NCRoom {
         &mut self,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut fetch_key = 0;
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_chat_update(&self.room_data.token, 200, 1)
+                .await
+                .unwrap()
+        };
+        let response = response_onceshot
+            .await
+            .expect("Failed for fetch chat update")
+            .expect("Failed request");
+
+        // Room is empty.
+        if response.is_empty() {
+            return Ok(());
+        }
+
+        let fetch_key = response
+            .first()
+            .expect("Failed to get last message of initial fetch")
+            .id;
 
         let last_entry = *(self
             .messages
@@ -464,37 +519,31 @@ impl NCRoomInterface for NCRoom {
             .0);
 
         log::debug!(
-            "Fetching Full history. Size {}, First {}, Initial Fetch {}",
+            "Fetching Full history. Size stored {}, size to check {}, last {}, first {}",
             self.messages.len(),
+            last_entry - fetch_key,
             last_entry,
             fetch_key
         );
-
-        while fetch_key <= last_entry && fetch_key >= 0 {
-            let response_onceshot = {
-                requester
-                    .lock()
-                    .await
-                    .request_chat_update(&self.room_data.token, 200, fetch_key)
-                    .await
-                    .unwrap()
-            };
-            let response = response_onceshot
-                .await
-                .expect("Failed for fetch chat update")
-                .expect("Failed request");
-            if response.is_empty() {
-                break;
-            }
-            fetch_key = response.last().expect("No Messages fetched").id;
-
-            for message in response {
-                self.messages.insert(message.id, message.into());
-            }
+        let mut running_key = fetch_key + 100_000;
+        let mut thread_handles = vec![];
+        for key in (fetch_key..=last_entry).step_by(100_000) {
+            log::debug!("Fetching thread {} to {} ", key, running_key);
+            let token = self.room_data.token.clone();
+            let cloned_requester = requester.clone();
+            thread_handles.push(tokio::spawn(async move {
+                NCRoom::fetch_message_subset(key, running_key, cloned_requester, &token).await
+            }));
+            running_key += 100_000;
+        }
+        log::debug!("Spawned all reads for fetching");
+        for handle in thread_handles {
+            let mut results = handle.await.expect("No Messages could be fetched.");
+            self.messages.append(&mut results);
         }
 
         log::debug!(
-            "Updated Full history. Size {}, First {}, Final Fetch_key {}",
+            "Updated Full history. Size {}, last {}, first {}",
             self.messages.len(),
             last_entry,
             fetch_key

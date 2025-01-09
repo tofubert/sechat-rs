@@ -236,7 +236,9 @@ impl<Backend: NCBackend> App<'_, Backend> {
     pub async fn fetch_current_room_history(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.backend
             .fetch_room_history(&self.current_room_token)
-            .await
+            .await?;
+        self.chat.select_last_message();
+        Ok(())
     }
 
     pub fn new_input_key(&mut self, key: Input) {
