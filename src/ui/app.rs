@@ -39,7 +39,7 @@ use crossterm::event::{
 };
 use tui_textarea::Key;
 
-use super::notifications::NotifyWrapper;
+use super::{notifications::NotifyWrapper, widget::logger::LogBox};
 
 enum ProcessEventResult {
     Continue,
@@ -53,6 +53,7 @@ pub enum CurrentScreen {
     Editing,
     Exiting,
     Helping,
+    Logging,
 }
 
 pub struct App<'a, Backend: NCBackend> {
@@ -64,6 +65,7 @@ pub struct App<'a, Backend: NCBackend> {
     input: InputBox<'a>,
     help: HelpBox,
     users: Users<'a>,
+    logging: LogBox,
     user_sidebar_visible: bool,
     default_style: Style,
     current_room_token: Token,
@@ -91,6 +93,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 users.update(&backend, &init_room);
                 users
             },
+            logging: LogBox::new(config),
             backend,
             help: HelpBox::new(config),
             user_sidebar_visible: config.data.ui.user_sidebar_default,
@@ -132,6 +135,8 @@ impl<Backend: NCBackend> App<'_, Backend> {
             );
         } else if self.current_screen == CurrentScreen::Helping {
             self.help.render_area(f, base_layout[1]);
+        } else if self.current_screen == CurrentScreen::Logging {
+            self.logging.render_area(f, base_layout[1]);
         } else {
             let main_layout = Layout::default()
                 .direction(Direction::Vertical)
@@ -310,6 +315,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                             .await?;
                     }
                     CurrentScreen::Opening => self.handle_key_in_opening(key).await?,
+                    CurrentScreen::Logging => self.handle_key_in_logging(key),
                 }
             }
             Event::Mouse(mouse) => match mouse.kind {
@@ -389,6 +395,15 @@ impl<Backend: NCBackend> App<'_, Backend> {
         }
     }
 
+    fn handle_key_in_logging(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
+            KeyCode::Esc => self.current_screen = CurrentScreen::Reading,
+            KeyCode::Char('o') => self.current_screen = CurrentScreen::Opening,
+            _ => self.logging.handle_ui_event(key),
+        }
+    }
+
     fn handle_key_in_exit(
         &mut self,
         key: KeyEvent,
@@ -427,6 +442,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('o') => self.current_screen = CurrentScreen::Opening,
             KeyCode::Char('q') => self.current_screen = CurrentScreen::Exiting,
             KeyCode::Char('?') => self.current_screen = CurrentScreen::Helping,
+            KeyCode::Char('L') => self.current_screen = CurrentScreen::Logging,
             KeyCode::Char('u') => self.toggle_user_sidebar(),
             _ => (),
         };

@@ -158,10 +158,10 @@ impl Config {
 
     pub fn config_logging(&self) {
         // Set max_log_level to Trace
-        tui_logger::init_logger(log::LevelFilter::Debug).unwrap();
+        tui_logger::init_logger(log::LevelFilter::Trace).unwrap();
 
         // Set default level for unknown targets to Trace
-        tui_logger::set_default_level(log::LevelFilter::Debug);
+        tui_logger::set_default_level(log::LevelFilter::Trace);
         tui_logger::set_level_for_target("reqwest::connect", LevelFilter::Info);
 
         if self.data.general.log_to_file {
