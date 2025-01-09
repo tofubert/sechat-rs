@@ -55,7 +55,7 @@
 //! With the config read the [`backend::nc_talk::NCTalk`] is created, which first tries to read old chat logs from disk, and the fetches updates from the server.
 //! Note: Currently gaps in the chat history are not filled automatically.
 //! The `NCTalk` instance is holding a list of all [`backend::nc_room::NCRoom`]s.
-//! [`backend::nc_request::nc_requester::NCRequest`] is the thread handler for the API Requests and NCRequestWorker does the actual request work to the API.
+//! [`backend::nc_request::nc_requester::NCRequest`] is the thread handler for the API Requests and `NCRequestWorker` does the actual request work to the API.
 //! Responses are parsed using [`serde`] and various structs in [`backend::nc_request`].
 //!
 //! ### UI

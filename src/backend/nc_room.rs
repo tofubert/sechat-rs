@@ -98,7 +98,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
-/// Real implementation of the NCRoom.
+/// Real implementation of the `NCRoom`.
 /// Holds its Messages, Participants, Raw Data and Path to write its log to.
 #[derive(Debug, Default)]
 pub struct NCRoom {
@@ -115,7 +115,7 @@ pub struct NCRoom {
 }
 
 impl NCRoom {
-    /// Create a new NCRoom.
+    /// Create a new `NCRoom`.
     /// Tries to read chat data from the disk, else fetches it.
     /// Requester is in a Thread safe Arc/Mutex.
     pub async fn new<Requester: NCRequestInterface + 'static + std::marker::Sync>(
