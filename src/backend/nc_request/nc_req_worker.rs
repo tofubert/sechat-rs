@@ -108,7 +108,6 @@ impl NCRequestWorker {
     ) -> Result<Option<Vec<NCReqDataMessage>>, Box<dyn Error>> {
         let url_string = self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token;
         let params = if let Some(lastId) = last_message {
-            log::debug!("Last MessageID {}", lastId);
             HashMap::from([
                 ("limit", maxMessage.to_string()),
                 ("setReadMarker", "0".into()),
@@ -128,7 +127,6 @@ impl NCRequestWorker {
         let response = self.request(url).await?;
         match response.status() {
             reqwest::StatusCode::OK => {
-                log::debug!("Got new Messages.");
                 let text = response.text().await?;
                 match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataMessage>>>(&text) {
                     Ok(parser_response) => Ok(Some(parser_response.ocs.data)),
@@ -138,10 +136,7 @@ impl NCRequestWorker {
                     }
                 }
             }
-            reqwest::StatusCode::NOT_MODIFIED => {
-                log::debug!("No new Messages.");
-                Ok(Some(Vec::new()))
-            }
+            reqwest::StatusCode::NOT_MODIFIED => Ok(Some(Vec::new())),
             reqwest::StatusCode::PRECONDITION_FAILED => Ok(None),
             _ => {
                 log::debug!("{} got Err {:?}", token, response);

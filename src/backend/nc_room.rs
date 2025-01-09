@@ -525,16 +525,16 @@ impl NCRoomInterface for NCRoom {
             last_entry,
             fetch_key
         );
-        let mut running_key = fetch_key + 100_000;
+        let mut running_key = fetch_key + 10_000;
         let mut thread_handles = vec![];
-        for key in (fetch_key..=last_entry).step_by(100_000) {
+        for key in (fetch_key..=last_entry).step_by(10_000) {
             log::debug!("Fetching thread {} to {} ", key, running_key);
             let token = self.room_data.token.clone();
             let cloned_requester = requester.clone();
             thread_handles.push(tokio::spawn(async move {
                 NCRoom::fetch_message_subset(key, running_key, cloned_requester, &token).await
             }));
-            running_key += 100_000;
+            running_key += 10_000;
         }
         log::debug!("Spawned all reads for fetching");
         for handle in thread_handles {
