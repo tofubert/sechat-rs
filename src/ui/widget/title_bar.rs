@@ -66,8 +66,8 @@ impl TitleBar<'_> {
             self.status_text =
                 user.and_then(|user| match (&user.statusIcon, &user.statusMessage) {
                     (None, None) => None,
-                    (None, Some(msg)) => Some(String::from(msg)),
-                    (Some(icon), None) => Some(String::from(icon)),
+                    (None, Some(msg)) => Some(msg.to_string()),
+                    (Some(icon), None) => Some(icon.to_string()),
                     (Some(icon), Some(msg)) => Some(format!("{icon} {msg}")),
                 });
         }
@@ -98,7 +98,7 @@ impl Widget for &TitleBar<'_> {
         let header = if self.unread > 0 {
             format!("Current({}): ", self.unread)
         } else {
-            String::from("Current: ")
+            "Current: ".to_string()
         };
         let room_style = if let Some(status) = &self.status {
             match status.as_str() {
@@ -188,12 +188,12 @@ mod tests {
         let mut mock_room = MockNCRoomInterface::new();
         let mut dummy_user = NCReqDataParticipants::default();
         dummy_user.displayName = "Butz".to_string();
-        dummy_user.status = Some(String::from("online"));
-        dummy_user.statusMessage = Some(String::from("having fun"));
+        dummy_user.status = Some("online".to_string());
+        dummy_user.statusMessage = Some("having fun".to_string());
         mock_room.expect_get_users().return_const(vec![dummy_user]);
         mock_room.expect_get_unread().return_const(42_usize);
         mock_room.expect_is_dm().return_const(true);
-        mock_room.expect_get_display_name().return_const(String::from("Butz"));
+        mock_room.expect_get_display_name().return_const("Butz".to_string());
         mock_nc_backend
             .expect_get_unread_rooms()
             .once()
