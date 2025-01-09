@@ -193,7 +193,9 @@ mod tests {
         mock_room.expect_get_users().return_const(vec![dummy_user]);
         mock_room.expect_get_unread().return_const(42_usize);
         mock_room.expect_is_dm().return_const(true);
-        mock_room.expect_get_display_name().return_const("Butz".to_string());
+        mock_room
+            .expect_get_display_name()
+            .return_const("Butz".to_string());
         mock_nc_backend
             .expect_get_unread_rooms()
             .once()
