@@ -57,18 +57,18 @@ impl TitleBar<'_> {
         if room.is_dm() {
             let user = room
                 .get_users()
-                .into_iter()
-                .find(|user| &user.displayName == room.get_display_name());
+                .iter()
+                .find(|user| user.displayName == room.get_display_name());
             if user.is_none() {
                 log::warn!("Could not find user associated with this DM");
             }
-            self.status = user.and_then(|user| (&user.status).clone());
+            self.status = user.and_then(|user| user.status.clone());
             self.status_text =
                 user.and_then(|user| match (&user.statusIcon, &user.statusMessage) {
                     (None, None) => None,
                     (None, Some(msg)) => Some(String::from(msg)),
                     (Some(icon), None) => Some(String::from(icon)),
-                    (Some(icon), Some(msg)) => Some(String::from(format!("{icon} {msg}"))),
+                    (Some(icon), Some(msg)) => Some(format!("{icon} {msg}")),
                 });
         }
         self.unread = backend.get_room(current_room).get_unread();
