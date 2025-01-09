@@ -371,6 +371,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             } => {
                 // SEND MEssage
                 self.current_screen = CurrentScreen::Reading;
+                self.mark_current_as_read().await?;
                 self.send_message().await?;
             }
             _ => self.new_input_key(key),
