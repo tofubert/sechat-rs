@@ -181,16 +181,19 @@ mod tests {
         let config = init("./test/").unwrap();
 
         let mut mock_nc_backend = MockNCTalk::new();
-        let backend = TestBackend::new(30, 3);
+        let backend = TestBackend::new(60, 3);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut bar = TitleBar::new(CurrentScreen::Reading, "General".to_string(), &config);
 
         let mut mock_room = MockNCRoomInterface::new();
         let mut dummy_user = NCReqDataParticipants::default();
         dummy_user.displayName = "Butz".to_string();
+        dummy_user.status = Some(String::from("online"));
+        dummy_user.statusMessage = Some(String::from("having fun"));
         mock_room.expect_get_users().return_const(vec![dummy_user]);
-        mock_room.expect_get_unread().return_const(false);
-        mock_room.expect_is_dm().return_const(false);
+        mock_room.expect_get_unread().return_const(42_usize);
+        mock_room.expect_is_dm().return_const(true);
+        mock_room.expect_get_display_name().return_const(String::from("Butz"));
         mock_nc_backend
             .expect_get_unread_rooms()
             .once()
@@ -202,19 +205,21 @@ mod tests {
         bar.update(CurrentScreen::Reading, &mock_nc_backend, &"123".to_string());
 
         terminal
-            .draw(|frame| bar.render_area(frame, Rect::new(0, 0, 30, 3)))
+            .draw(|frame| bar.render_area(frame, Rect::new(0, 0, 60, 3)))
             .unwrap();
 
         let mut expected = Buffer::with_lines([
-            "Current: Butz           Readin",
-            "                              ",
-            "──────────────────────────────",
+            "Current(42): Butz (having fun)                       Reading",
+            "                                                            ",
+            "────────────────────────────────────────────────────────────",
         ]);
-        expected.set_style(Rect::new(0, 0, 30, 3), config.theme.default_style());
+        expected.set_style(Rect::new(0, 0, 60, 3), config.theme.default_style());
 
         expected.set_style(Rect::new(0, 0, 13, 1), config.theme.title_status_style());
+        expected.set_style(Rect::new(13, 0, 4, 1), config.theme.user_online_style());
+        expected.set_style(Rect::new(17, 0, 13, 1), config.theme.title_status_style());
 
-        expected.set_style(Rect::new(24, 0, 6, 1), config.theme.title_status_style());
+        expected.set_style(Rect::new(53, 0, 7, 1), config.theme.title_status_style());
 
         terminal.backend().assert_buffer(&expected);
     }
