@@ -3,6 +3,7 @@ use tokio::sync::{
     mpsc::{self, Sender},
     oneshot,
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::config::Config;
 use async_trait::async_trait;
@@ -86,6 +87,7 @@ pub trait NCRequestInterface: Debug + Send + Send + Sync {
         last_message: i32,
     ) -> ApiResult<Vec<NCReqDataMessage>>;
     async fn request_mark_chat_read(&self, token: &str, last_message: i32) -> ApiResult<()>;
+    async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 /// The [`NCRequest`] uses a number of Threads to distribute the Requests to the Workers.
@@ -96,6 +98,7 @@ pub trait NCRequestInterface: Debug + Send + Send + Sync {
 #[derive(Debug)]
 pub struct NCRequest {
     request_tx: Sender<ApiRequests>,
+    cancel_token: CancellationToken,
 }
 
 impl NCRequest {
@@ -156,27 +159,36 @@ impl NCRequest {
         let (tx, mut rx) = mpsc::channel::<ApiRequests>(50);
 
         let mut worker_queue = vec![];
+        let cancel_token = CancellationToken::new();
 
         for i in 1..6 {
+            let cloned_cancel_token = cancel_token.clone();
+
             let (tx_worker, mut rx_worker) = mpsc::channel::<ApiRequests>(10);
 
             worker_queue.push(tx_worker);
             let worker = NCRequestWorker::new(config).expect("Failed to create worker.");
 
             tokio::spawn(async move {
-                loop {
+                while !cloned_cancel_token.is_cancelled() {
                     if let Some(req) = rx_worker.recv().await {
                         NCRequest::handle_req(&worker, req).await;
                     };
                 }
             });
         }
+        let cloned_cancel_token = cancel_token.clone();
 
         tokio::spawn(async move {
-            loop {
+            while !cloned_cancel_token.is_cancelled() {
                 let mut buffer: Vec<ApiRequests> = vec![];
                 let added = rx.recv_many(&mut buffer, 5).await;
                 log::debug!("got {} requests to API", added);
+
+                // the revc_many function might be in flight while we get cancelt.
+                if cloned_cancel_token.is_cancelled() {
+                    break;
+                }
 
                 if added == 0 {
                     buffer.push(rx.recv().await.expect("Failed to get message"));
@@ -207,7 +219,10 @@ impl NCRequest {
         });
         log::info!("Spawned API Thread");
 
-        NCRequest { request_tx: tx }
+        NCRequest {
+            request_tx: tx,
+            cancel_token,
+        }
     }
 }
 
@@ -309,6 +324,10 @@ impl NCRequestInterface for NCRequest {
             .expect("Queuing request for sending of message failed.");
         Ok(rx)
     }
+    async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>> {
+        self.cancel_token.cancel();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -342,6 +361,7 @@ mock! {
         last_message: i32,
     ) -> ApiResult<Vec<NCReqDataMessage>>;
     async fn request_mark_chat_read(&self, token: &str, last_message: i32) -> ApiResult<()>;
+    async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>>;
     }
     impl Clone for NCRequest {   // specification of the trait to mock
         fn clone(&self) -> Self;
