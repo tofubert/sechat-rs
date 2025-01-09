@@ -32,7 +32,7 @@ impl Widget for &HelpBox {
                     Row::new(["q", "quit", "enter the quit screen."]),
                     Row::new(["o", "open", "enter the chat selection screen."]),
                     Row::new(["u", "users sidebar", "Toggle whether the users are shown in a chat sidebar. Available in reading mode."]),
-
+                    Row::new(["f", "fetch history", "Force a full history fetch of the current chat. Might take some time!"]),
                     Row::new(["?", "help", "enter this help screen."]),
                     Row::new([
                         "m",
@@ -94,7 +94,7 @@ mod tests {
         std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
 
-        let backend = TestBackend::new(40, 10);
+        let backend = TestBackend::new(40, 15);
         let mut terminal = Terminal::new(backend).unwrap();
         let help_box = HelpBox::new(&config);
 
@@ -102,7 +102,7 @@ mod tests {
         dummy_user.displayName = "Butz".to_string();
 
         terminal
-            .draw(|frame| help_box.render_area(frame, Rect::new(0, 0, 40, 10)))
+            .draw(|frame| help_box.render_area(frame, Rect::new(0, 0, 40, 15)))
             .unwrap();
 
         let mut expected = Buffer::with_lines([
@@ -110,14 +110,19 @@ mod tests {
             "q     quit                 enter the qui",
             "o     open                 enter the cha",
             "u     users sidebar        Toggle whethe",
+            "f     fetch history        Force a full ",
             "?     help                 enter this he",
             "m     mark as read         mark current ",
             "(e|i) edit                 enter the edi",
             "(u|d) jump scroll          scroll up or ",
             "ESC   leave Mode           leave help, o",
             "Enter send/select          Send Message,",
+            "                                        ",
+            "                                        ",
+            "                                        ",
+            "                                        ",
         ]);
-        expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
+        expected.set_style(Rect::new(0, 0, 40, 15), config.theme.default_style());
 
         expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
 
