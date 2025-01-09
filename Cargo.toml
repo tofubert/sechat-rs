@@ -23,11 +23,6 @@ exclude = [
 name = "sechat"
 path = "src/main.rs"
 
-# [[bin]]
-# name = "sechat-test"
-# path = "src/main2.rs"
-
-
 
 [dev-dependencies]
 mockall = { version = "0.13.1" }
