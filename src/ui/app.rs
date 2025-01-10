@@ -117,13 +117,19 @@ impl<Backend: NCBackend> App<'_, Backend> {
         let tui = init(config.get_enable_mouse(), config.get_enable_paste())
             .expect("Could not Create TUI Backend.");
 
+        log::debug!("crossterm setup done.");
+
         // create app and run it
         self.run_app(tui).await?;
+
+        log::info!("Shutting Down.");
 
         // Kill worker threads.
         self.backend.shutdown().await?;
 
         restore(config.get_enable_mouse(), config.get_enable_paste())?;
+
+        log::info!("Restored old terminal settings.");
         Ok(())
     }
     pub fn ui(&mut self, f: &mut Frame) {
@@ -247,7 +253,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             self.notify.maybe_notify_new_message(
                 self.backend.select_room(&self.current_room_token).await?,
             )?;
-            self.current_screen = CurrentScreen::Reading;
+            self.switch_screen(CurrentScreen::Reading);
             self.update_ui()?;
             self.chat.select_last_message();
         } else {
@@ -298,7 +304,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
         mut terminal: Terminal<B>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.select_room().await?;
-        log::debug!("Entering Main Loop");
+        log::info!("Entering Main Loop");
         loop {
             terminal.draw(|f| self.ui(f))?;
 
@@ -310,7 +316,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     Err(why) => return Err(why),
                 }
             } else {
-                log::debug!("Looking for Updates on the server.");
+                log::trace!("Looking for Updates on the server.");
                 // trigger a fetch from upstream for messages
                 self.fetch_updates().await?;
             }
@@ -325,7 +331,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
         // `Ok(true)`.
         match event {
             Event::Key(key) => {
-                log::debug!("Processing key event {:?}", key);
+                log::trace!("Processing key event {:?}", key);
                 if let Some(popup) = self.popup {
                     match popup {
                         Popup::Help => self.handle_key_in_help(key),
@@ -355,7 +361,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 _ => (),
             },
             _ => {
-                log::debug!("Unknown Event {:?}", event);
+                log::warn!("Unknown Event {:?}", event);
             }
         }
         Ok(ProcessEventResult::Continue)
@@ -366,7 +372,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
         key: KeyEvent,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match key.code {
-            KeyCode::Esc => self.current_screen = CurrentScreen::Reading,
+            KeyCode::Esc => self.switch_screen(CurrentScreen::Reading),
             KeyCode::Char('h') | KeyCode::Left => _ = self.selector.state.key_left(),
             KeyCode::Char('j') | KeyCode::Down => _ = self.selector.state.key_down(),
             KeyCode::Char('k') | KeyCode::Up => _ = self.selector.state.key_up(),
@@ -397,14 +403,14 @@ impl<Backend: NCBackend> App<'_, Backend> {
         key: Input,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match key {
-            Input { key: Key::Esc, .. } => self.current_screen = CurrentScreen::Reading,
+            Input { key: Key::Esc, .. } => self.switch_screen(CurrentScreen::Reading),
             Input {
                 key: Key::Enter,
                 shift: false,
                 ..
             } => {
                 // SEND MEssage
-                self.current_screen = CurrentScreen::Reading;
+                self.switch_screen(CurrentScreen::Reading);
                 self.mark_current_as_read().await?;
                 self.send_message().await?;
             }
@@ -420,7 +426,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Esc => self.popup = None,
             KeyCode::Char('o') => {
                 self.popup = None;
-                self.current_screen = CurrentScreen::Opening;
+                self.switch_screen(CurrentScreen::Opening);
             }
             _ => (),
         }
@@ -430,8 +436,8 @@ impl<Backend: NCBackend> App<'_, Backend> {
         match key.code {
             KeyCode::Char('q') => self.popup = Some(Popup::Exit),
             KeyCode::Char('?') => self.popup = Some(Popup::Help),
-            KeyCode::Esc => self.current_screen = CurrentScreen::Reading,
-            KeyCode::Char('o') => self.current_screen = CurrentScreen::Opening,
+            KeyCode::Esc => self.switch_screen(CurrentScreen::Reading),
+            KeyCode::Char('o') => self.switch_screen(CurrentScreen::Opening),
             _ => self.logging.handle_ui_event(key),
         }
     }
@@ -465,19 +471,24 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.popup = Some(Popup::Exit);
             }
-            KeyCode::Char('e' | 'i') => self.current_screen = CurrentScreen::Editing,
+            KeyCode::Char('e' | 'i') => self.switch_screen(CurrentScreen::Editing),
             KeyCode::Char('j') | KeyCode::Down if key.kind == KeyEventKind::Press => {
                 self.scroll_down();
             }
             KeyCode::Char('k') | KeyCode::Up if key.kind == KeyEventKind::Press => self.scroll_up(),
             KeyCode::Char('m') => self.mark_current_as_read().await?,
-            KeyCode::Char('o') => self.current_screen = CurrentScreen::Opening,
-            KeyCode::Char('L') => self.current_screen = CurrentScreen::Logging,
+            KeyCode::Char('o') => self.switch_screen(CurrentScreen::Opening),
+            KeyCode::Char('L') => self.switch_screen(CurrentScreen::Logging),
             KeyCode::Char('q') => self.popup = Some(Popup::Exit),
             KeyCode::Char('?') => self.popup = Some(Popup::Help),
             KeyCode::Char('u') => self.toggle_user_sidebar(),
             _ => (),
         };
         Ok(())
+    }
+
+    fn switch_screen(&mut self, next_screen: CurrentScreen) {
+        log::info!("Switching from {} to {}.", self.current_screen, next_screen);
+        self.current_screen = next_screen;
     }
 }

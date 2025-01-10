@@ -13,7 +13,7 @@ pub struct LogBox {
 impl LogBox {
     pub fn new(config: &Config) -> Self {
         LogBox {
-            state: TuiWidgetState::new().set_default_display_level(LevelFilter::Info),
+            state: TuiWidgetState::new().set_default_display_level(LevelFilter::Debug),
             style: config.theme.default_style(),
         }
     }
@@ -45,11 +45,11 @@ impl LogBox {
             .style_trace(self.style.fg(Color::Magenta))
             .style_info(self.style.fg(Color::Cyan))
             .style(self.style)
-            .output_separator(':')
+            .output_separator('|')
             .output_timestamp(Some("%H:%M:%S%.3f".to_string()))
             .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
             .output_target(true)
-            .output_file(true)
+            .output_file(false)
             .output_line(true)
             .state(&self.state);
         frame.render_widget(logger, log_area);

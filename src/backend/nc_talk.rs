@@ -112,7 +112,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             if let Some(room) = room_option {
                 rooms.insert(name, room);
             } else {
-                log::info!("Encountered a room that cannot be added {} ", name);
+                log::warn!("Encountered a room that cannot be added {} ", name);
             }
         }
     }
@@ -301,7 +301,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         // Open a file in write-only mode, returns `io::Result<File>`
         let mut file = match std::fs::File::create(path) {
             Err(why) => {
-                log::warn!(
+                log::error!(
                     "couldn't create top level log file {}: {}",
                     tmp_path_buf
                         .as_os_str()
@@ -315,7 +315,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         };
 
         if let Err(why) = file.write_all(serde_json::to_string(&data).unwrap().as_bytes()) {
-            log::warn!(
+            log::error!(
                 "couldn't write top level log file to {}: {}",
                 tmp_path_buf
                     .as_os_str()
@@ -412,7 +412,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         &mut self,
         token: &Token,
     ) -> Result<Option<(String, usize)>, Box<dyn Error>> {
-        log::debug!("key {}", token);
+        log::debug!("selected room {}", token);
         self.rooms
             .get_mut(token)
             .ok_or_else(|| format!("Failed to get Room ref for room selection: {token}."))?
