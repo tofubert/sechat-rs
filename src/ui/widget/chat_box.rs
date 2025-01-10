@@ -84,7 +84,7 @@ impl ChatBox<'_> {
                         "".into(),
                         Span::styled(today_str + date_str.as_str(), self.unread_message_style)
                             .into(),
-                    ]
+                    ];
                 }
                 self.messages.push(Row::new(date));
                 last_date = date_str;
