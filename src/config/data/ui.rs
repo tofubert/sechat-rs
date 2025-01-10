@@ -16,4 +16,7 @@ pub struct Ui {
     pub use_mouse: bool,
     #[toml_example(default = true)]
     pub use_paste: bool,
+    /// Default is dark-theme. light-theme is also possible
+    #[toml_example(default = "dark-theme")]
+    pub theme: String,
 }

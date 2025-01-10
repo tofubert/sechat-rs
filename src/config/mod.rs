@@ -74,6 +74,8 @@ pub fn init(path_arg: &str) -> Result<Config, String> {
         app_name: "sechat-rs".to_string(),
     })
     .unwrap();
+    let mut config = Config::default();
+    config.set_strategy(strategy.clone());
     let config_path_base = if path_arg.is_empty() {
         strategy.config_dir()
     } else {
@@ -83,21 +85,33 @@ pub fn init(path_arg: &str) -> Result<Config, String> {
         );
         path_arg.into()
     };
+    // First load config data
     let config_path = config_path_base.join("config.toml");
-    let theme_path = config_path_base.join("theme.toml");
 
     println!("Config Path: {:?}", config_path.as_os_str());
 
     check_config_exists_else_create_new::<ConfigOptions>(&config_path)?;
-    check_config_exists_else_create_new::<ColorPalette>(&theme_path)?;
-
     let data = read_config_file::<ConfigOptions>(&config_path)?;
-    let theme_data = read_config_file::<ColorPalette>(&theme_path)?;
-
-    let mut config = Config::default();
     config.set_config_data(data);
-    config.set_theme(theme_data);
-    config.set_strategy(strategy);
+
+    // Then use theme in config.toml to load theme
+    let default_themes = vec!["dark-theme", "light-theme"];
+    let theme_filename = config.data.ui.theme.clone();
+    let theme_path = config_path_base.join(theme_filename.clone() + ".toml");
+    if default_themes.contains(&theme_filename.as_str()) {
+        check_config_exists_else_create_new::<ColorPalette>(&theme_path)?;
+        let theme_data = read_config_file::<ColorPalette>(&theme_path)?;
+        config.set_theme(theme_data);
+    } else {
+        if !theme_path.exists() {
+            return Err(format!(
+                "Theme config {} doesn't exist.",
+                theme_path.to_str().unwrap()
+            )
+            .to_owned());
+        }
+    }
+
     Ok(config)
 }
 
