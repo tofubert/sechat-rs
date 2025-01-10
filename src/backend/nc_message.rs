@@ -1,4 +1,4 @@
-use super::nc_request::NCReqDataMessage;
+use super::nc_request::{NCReqDataMessage, NCReqDataMessageSystemMessage};
 use chrono::prelude::*;
 
 /// `NextCloud` message interface
@@ -73,19 +73,19 @@ impl NCMessage {
 
     /// return `true` if message is an edited message
     pub fn is_edit_note(&self) -> bool {
-        self.is_system() && self.0.systemMessage == "message_edited"
+        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::message_edited
     }
 
     pub fn is_revoked(&self) -> bool {
         self.is_system()
-            && (self.0.systemMessage == "message_deleted"
-                || self.0.systemMessage == "reaction_revoked"
-                || self.0.systemMessage == "reaction_deleted")
+            && (self.0.systemMessage == NCReqDataMessageSystemMessage::message_deleted
+                || self.0.systemMessage == NCReqDataMessageSystemMessage::reaction_revoked
+                || self.0.systemMessage == NCReqDataMessageSystemMessage::reaction_deleted)
     }
 
     /// return `true` if message is a reaction
     pub fn is_reaction(&self) -> bool {
-        self.is_system() && self.0.systemMessage == "reaction"
+        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::reaction
     }
 
     /// return `true` if message is a command
