@@ -232,11 +232,14 @@ impl NCRoom {
 
 #[async_trait]
 impl NCRoomInterface for NCRoom {
-    // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
+        // the room endpoint doesnt tell you about reactions...
+        // The NCTalk level update does however include system messages...
         self.messages
             .values()
-            .filter(|&message| !message.is_reaction() && !message.is_edit_note())
+            .filter(|&message| {
+                !message.is_reaction() && !message.is_edit_note() && !message.is_revoked()
+            })
             .collect::<Vec<&NCMessage>>()
             .last()
             .map(|message| message.get_id())
@@ -481,9 +484,19 @@ impl NCRoomInterface for NCRoom {
                 }
                 Ordering::Less => {
                     log::debug!(
-                        "Message Id was older than message stored '{}'! Stored {} Upstream {}",
+                        "Message Id was older than message stored '{}'! Stored {} {} {} Upstream {}",
                         self.to_string(),
                         last_internal_id,
+                        self.messages
+                            .get(&last_internal_id)
+                            .unwrap()
+                            .data()
+                            .messageType,
+                        self.messages
+                            .get(&last_internal_id)
+                            .unwrap()
+                            .data()
+                            .systemMessage,
                         message_id
                     );
                 }
