@@ -1,8 +1,8 @@
-use super::nc_request::NCReqDataMessage;
+use super::nc_request::{NCReqDataMessage, NCReqDataMessageSystemMessage};
 use chrono::prelude::*;
 
 /// `NextCloud` message interface
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NCMessage(NCReqDataMessage);
 
 impl From<NCReqDataMessage> for NCMessage {
@@ -19,6 +19,14 @@ impl NCMessage {
                 .expect("cannot convert UTC time stamp"),
         );
         time.format("%H:%M").to_string()
+    }
+
+    pub fn get_date_str(&self, date_format: &str) -> String {
+        let date: DateTime<Local> = DateTime::from(
+            DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
+                .expect("cannot convert UTC time stamp"),
+        );
+        date.format(date_format).to_string()
     }
 
     /// return opponent display name
@@ -73,12 +81,19 @@ impl NCMessage {
 
     /// return `true` if message is an edited message
     pub fn is_edit_note(&self) -> bool {
-        self.is_system() && self.0.systemMessage == "message_edited"
+        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::MessageEdited
+    }
+
+    pub fn is_revoked(&self) -> bool {
+        self.is_system()
+            && (self.0.systemMessage == NCReqDataMessageSystemMessage::MessageDeleted
+                || self.0.systemMessage == NCReqDataMessageSystemMessage::ReactionRevoked
+                || self.0.systemMessage == NCReqDataMessageSystemMessage::ReactionDeleted)
     }
 
     /// return `true` if message is a reaction
     pub fn is_reaction(&self) -> bool {
-        self.is_system() && self.0.systemMessage == "reaction"
+        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::Reaction
     }
 
     /// return `true` if message is a command

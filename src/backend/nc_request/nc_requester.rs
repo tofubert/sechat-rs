@@ -103,7 +103,7 @@ pub struct NCRequest {
 
 impl NCRequest {
     async fn handle_req(worker: &NCRequestWorker, req: ApiRequests) {
-        log::debug!("got a new API Request {}", req);
+        log::trace!("got a new API Request {}", req);
         match req {
             ApiRequests::FetchChatInitial(token, maxMessage, response) => {
                 response
@@ -183,7 +183,7 @@ impl NCRequest {
             while !cloned_cancel_token.is_cancelled() {
                 let mut buffer: Vec<ApiRequests> = vec![];
                 let added = rx.recv_many(&mut buffer, 5).await;
-                log::debug!("got {} requests to API", added);
+                log::trace!("got {} requests to API", added);
 
                 // the revc_many function might be in flight while we get cancelt.
                 if cloned_cancel_token.is_cancelled() {
@@ -194,19 +194,20 @@ impl NCRequest {
                     buffer.push(rx.recv().await.expect("Failed to get message"));
                 }
 
-                while worker_queue
+                if worker_queue
                     .first()
                     .expect("No Element in worker queue")
                     .capacity()
                     < 5
                 {
-                    worker_queue.sort_by_key(tokio::sync::mpsc::Sender::capacity);
+                    log::trace!(
+                        "Capacity of first {} and last {} worker. Rotating",
+                        worker_queue.first().unwrap().capacity(),
+                        worker_queue.last().unwrap().capacity()
+                    );
+                    worker_queue.rotate_right(1);
                 }
-                log::debug!(
-                    "Capacity of first {} and last {} worker",
-                    worker_queue.first().unwrap().capacity(),
-                    worker_queue.last().unwrap().capacity()
-                );
+
                 for message in buffer {
                     worker_queue
                         .first()
