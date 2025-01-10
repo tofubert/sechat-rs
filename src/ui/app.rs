@@ -231,7 +231,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
     }
 
     pub async fn select_room(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.selector.state.selected().len() == 2 {
+        if self.selector.state.selected().len() == if self.selector.searching { 1 } else { 2 } {
             self.current_room_token.clone_from(
                 self.selector
                     .state
@@ -242,6 +242,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             self.notify.maybe_notify_new_message(
                 self.backend.select_room(&self.current_room_token).await?,
             )?;
+            self.selector.searching = false;
             self.current_screen = CurrentScreen::Reading;
             self.update_ui()?;
             self.chat.select_last_message();
@@ -359,30 +360,41 @@ impl<Backend: NCBackend> App<'_, Backend> {
         &mut self,
         key: KeyEvent,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match key.code {
-            KeyCode::Esc => self.current_screen = CurrentScreen::Reading,
-            KeyCode::Char('h') | KeyCode::Left => _ = self.selector.state.key_left(),
-            KeyCode::Char('j') | KeyCode::Down => _ = self.selector.state.key_down(),
-            KeyCode::Char('k') | KeyCode::Up => _ = self.selector.state.key_up(),
-            KeyCode::Char('l') | KeyCode::Right => _ = self.selector.state.key_right(),
-            KeyCode::Char('d') | KeyCode::PageDown => {
-                _ = self.selector.state.select_relative(|current| {
-                    current.map_or(0, |current| current.saturating_add(9))
-                });
+        if self.selector.searching {
+            match key.code {
+                KeyCode::Down => _ = self.selector.state.key_down(),
+                KeyCode::Up => _ = self.selector.state.key_up(),
+                KeyCode::Enter => self.select_room().await?,
+                KeyCode::Esc => self.selector.searching = false,
+                _ => _ = self.selector.search_bar.input(key),
             }
-            KeyCode::Char('u') | KeyCode::PageUp => {
-                _ = self.selector.state.select_relative(|current| {
-                    current.map_or(0, |current| current.saturating_sub(9))
-                });
-            }
-            KeyCode::Char('q') => self.popup = Some(Popup::Exit),
-            KeyCode::Char('?') => self.popup = Some(Popup::Help),
-            KeyCode::Char(' ') => _ = self.selector.state.toggle_selected(),
-            KeyCode::Enter => self.select_room().await?,
-            KeyCode::Home => _ = self.selector.state.select_first(),
-            KeyCode::End => _ = self.selector.state.select_last(),
-            _ => (),
-        };
+        } else {
+            match key.code {
+                KeyCode::Esc => self.current_screen = CurrentScreen::Reading,
+                KeyCode::Char('h') | KeyCode::Left => _ = self.selector.state.key_left(),
+                KeyCode::Char('j') | KeyCode::Down => _ = self.selector.state.key_down(),
+                KeyCode::Char('k') | KeyCode::Up => _ = self.selector.state.key_up(),
+                KeyCode::Char('l') | KeyCode::Right => _ = self.selector.state.key_right(),
+                KeyCode::Char('d') | KeyCode::PageDown => {
+                    _ = self.selector.state.select_relative(|current| {
+                        current.map_or(0, |current| current.saturating_add(9))
+                    });
+                }
+                KeyCode::Char('u') | KeyCode::PageUp => {
+                    _ = self.selector.state.select_relative(|current| {
+                        current.map_or(0, |current| current.saturating_sub(9))
+                    });
+                }
+                KeyCode::Char('/') => self.selector.searching = true,
+                KeyCode::Char('q') => self.popup = Some(Popup::Exit),
+                KeyCode::Char('?') => self.popup = Some(Popup::Help),
+                KeyCode::Char(' ') => _ = self.selector.state.toggle_selected(),
+                KeyCode::Enter => self.select_room().await?,
+                KeyCode::Home => _ = self.selector.state.select_first(),
+                KeyCode::End => _ = self.selector.state.select_last(),
+                _ => (),
+            };
+        }
         Ok(())
     }
 
