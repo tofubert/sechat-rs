@@ -65,6 +65,6 @@ pub struct ColorPalette {
     pub user_online: Color,
 
     /// Borders for popup windows
-    #[toml_example(default = "red")]
+    #[toml_example(default = "#ff757f")]
     pub popup_border: Color,
 }
