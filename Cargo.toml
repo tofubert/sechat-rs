@@ -74,3 +74,25 @@ unsafe_code = "forbid"
 
 [lints.clippy]
 pedantic = "deny"
+
+[profile.release]
+# Disable debug information.
+debug = false
+
+# Strip symbols from the binary
+strip = true
+
+# Enable link time optimization (LTO) to remove dead code
+lto = true
+
+# Improve size optimization over build time
+codegen-units = 1
+
+# Disable debug assertions.
+debug-assertions = false
+
+# Disable overflow checks.
+overflow-checks = false
+
+# Disable rpath.
+rpath = false
