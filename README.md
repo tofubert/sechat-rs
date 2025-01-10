@@ -10,7 +10,7 @@
 
 ## Setup
 
-* run "cargo r" or "sechat-rs" and enjoy
+* run "cargo r" or "sechat" and enjoy
 * If no config is found a default config will be created, which you can fill in.
 * a "-c" Option for console exists, if none is proveded it will default to XDG default paths.
 * Logs will be written to "dev.log". This is so we dont write log output into the terminal UI.
@@ -48,7 +48,7 @@ A list of planned and requested freatures is also kept there.
 
 ## The Name
 Originally intended to be called seshat, after the egyptian goddess of writing, a typo became sechat.
-Thank to Sebastian for sugesting the name in the first place. 
+Thank to Sebastian for sugesting the name in the first place.
 
 ## Sponsors
 Thanks to [emlix gmbh](https://github.com/emlix) for allowing [@tofu](https://github.com/tofubert) and other so spend some of their work time to tinker with this.
