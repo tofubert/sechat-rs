@@ -167,7 +167,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
         self.title.render_area(f, base_layout[0]);
         if let Some(popup) = self.popup {
             let (horizontal, vertical) = match popup {
-                Popup::Help => (Constraint::Length(130), Constraint::Length(12)),
+                Popup::Help => (Constraint::Length(130), Constraint::Length(14)),
                 Popup::Exit => (Constraint::Length(40), Constraint::Length(3)),
             };
             let [area] = Layout::horizontal([horizontal])
