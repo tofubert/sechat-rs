@@ -65,6 +65,12 @@ impl Theme {
             .bg(self.data.background_important_titlebar)
             .fg(self.data.foreground_important_titlebar)
     }
+
+    pub fn popup_border_style(&self) -> Style {
+        Style::new()
+            .fg(self.data.popup_border)
+            .bg(self.data.background)
+    }
 }
 
 #[cfg(test)]
@@ -118,6 +124,10 @@ mod tests {
                 .fg(Color::default())
                 .bg(Color::default())
                 .bold()
+        );
+        assert_eq!(
+            theme.popup_border_style(),
+            Style::new().fg(Color::default()).bg(Color::default())
         );
     }
 
