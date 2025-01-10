@@ -1,6 +1,7 @@
 use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
+use chrono::{DateTime, Utc};
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -58,12 +59,24 @@ impl ChatBox<'_> {
         use std::convert::TryInto;
 
         self.messages.clear();
+        let mut last_date = DateTime::<Utc>::MIN_UTC.format("%Y/%m/%d").to_string();
         for message_data in backend
             .get_room(current_room)
             .get_messages()
             .values()
             .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
         {
+            let date_str = message_data.get_date_str();
+            if date_str != last_date {
+                let date: Vec<Cell> = vec![
+                    "".into(),
+                    "".into(),
+                    Span::styled(date_str.clone(), self.unread_message_style).into(),
+                ];
+                self.messages.push(Row::new(date));
+                last_date = date_str;
+            }
+
             let name = textwrap::wrap(
                 message_data.get_name().to_string().as_str(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
@@ -200,6 +213,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn render() {
         let dir = tempfile::tempdir().unwrap();
 
@@ -267,6 +281,7 @@ mod tests {
         terminal.backend().assert_buffer(&expected);
 
         chat_box.update_messages(&mock_nc_backend, &"123".to_string());
+        // chat_box.select_last_message();
 
         terminal
             .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
@@ -274,10 +289,10 @@ mod tests {
 
         let mut expected = Buffer::with_lines([
             "Time  Name                 Message      ",
+            "                           1970/01/01   ",
             "01:33 Hundi                Butz         ",
-            "04:46 Stinko               Bert         ",
-            "                                        ",
-            "                                        ",
+            "                           1970/01/03   ",
+            "08:33 Stinko               Bert         ",
             "                                        ",
             "                                        ",
             "                                        ",
@@ -285,23 +300,36 @@ mod tests {
             "                                        ",
         ]);
         expected.set_style(Rect::new(0, 0, 40, 10), config.theme.default_style());
-
         expected.set_style(Rect::new(0, 0, 40, 1), config.theme.table_header_style());
         expected.set_style(
             Rect::new(0, 1, 40, 1),
             config.theme.default_highlight_style(),
         );
-        expected.set_string(
-            0,
-            1,
-            DateTime::<Local>::from(timestamp_1)
-                .format("%H:%M")
-                .to_string(),
-            config.theme.default_highlight_style(),
+        expected.set_style(
+            Rect::new(27, 1, 10, 1),
+            config
+                .theme
+                .default_highlight_style()
+                .add_modifier(Modifier::BOLD),
+        );
+        expected.set_style(
+            Rect::new(27, 3, 10, 1),
+            config
+                .theme
+                .unread_message_style()
+                .add_modifier(Modifier::BOLD),
         );
         expected.set_string(
             0,
             2,
+            DateTime::<Local>::from(timestamp_1)
+                .format("%H:%M")
+                .to_string(),
+            config.theme.default_style(),
+        );
+        expected.set_string(
+            0,
+            4,
             DateTime::<Local>::from(timestamp_2)
                 .format("%H:%M")
                 .to_string(),

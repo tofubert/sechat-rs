@@ -21,6 +21,14 @@ impl NCMessage {
         time.format("%H:%M").to_string()
     }
 
+    pub fn get_date_str(&self) -> String {
+        let date: DateTime<Local> = DateTime::from(
+            DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
+                .expect("cannot convert UTC time stamp"),
+        );
+        date.format("%Y/%m/%d").to_string()
+    }
+
     /// return opponent display name
     pub fn get_name(&self) -> &str {
         if !self.is_comment() || self.is_system() || self.is_comment_deleted() || self.is_command()
