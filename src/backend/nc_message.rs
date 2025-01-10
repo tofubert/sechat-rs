@@ -76,6 +76,13 @@ impl NCMessage {
         self.is_system() && self.0.systemMessage == "message_edited"
     }
 
+    pub fn is_revoked(&self) -> bool {
+        self.is_system()
+            && (self.0.systemMessage == "message_deleted"
+                || self.0.systemMessage == "reaction_revoked"
+                || self.0.systemMessage == "reaction_deleted")
+    }
+
     /// return `true` if message is a reaction
     pub fn is_reaction(&self) -> bool {
         self.is_system() && self.0.systemMessage == "reaction"
