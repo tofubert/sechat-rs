@@ -300,7 +300,7 @@ impl NCRoomInterface for NCRoom {
         message: String,
         requester: Arc<Mutex<Requester>>,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        log::debug!("Send Message {}", &message);
+        log::info!("Send Message {}", &message);
         let response_onceshot = {
             requester
                 .lock()
@@ -323,6 +323,7 @@ impl NCRoomInterface for NCRoom {
         data_option: Option<NCReqDataRoom>,
         requester: Arc<Mutex<Requester>>,
     ) -> Result<Option<(String, usize)>, Box<dyn std::error::Error>> {
+        log::trace!("Updating {}", self.room_data.displayName);
         if let Some(data) = data_option {
             self.room_data = data.clone();
         }
@@ -347,7 +348,7 @@ impl NCRoomInterface for NCRoom {
         let update_info = Some((self.room_data.displayName.clone(), response.len()));
 
         if !is_empty {
-            log::debug!(
+            log::info!(
                 "Updating {} adding {} new Messages",
                 self.to_string(),
                 response.len().to_string()
@@ -380,6 +381,7 @@ impl NCRoomInterface for NCRoom {
         requester: Arc<Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         if !self.messages.is_empty() {
+            log::info!("Marking room {} as read", self.room_data.displayName);
             let response_onceshot = {
                 requester
                     .lock()
@@ -418,7 +420,7 @@ impl NCRoomInterface for NCRoom {
                     self.update(data_option, requester).await?;
                 }
                 Ordering::Less => {
-                    log::info!(
+                    log::debug!(
                         "Message Id was older than message stored '{}'! Stored {} Upstream {}",
                         self.to_string(),
                         last_internal_id,
