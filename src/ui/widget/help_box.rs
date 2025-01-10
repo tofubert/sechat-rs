@@ -114,7 +114,7 @@ mod tests {
             "│  q     quit                 enter the qui  │",
             "│  o     open                 enter the cha  │",
             "│  u     users sidebar        Toggle whethe  │",
-            "|  f     fetch history        Force a full   |",
+            "│  f     fetch history        Force a full   │",
             "│  ?     help                 enter this he  │",
             "│  m     mark as read         mark current   │",
             "│  (e|i) edit                 enter the edi  │",
@@ -126,7 +126,7 @@ mod tests {
         ]);
         expected.set_style(Rect::new(0, 0, 46, 15), config.theme.popup_border_style());
 
-        expected.set_style(Rect::new(1, 1, 44, 12), config.theme.default_style());
+        expected.set_style(Rect::new(1, 1, 44, 13), config.theme.default_style());
 
         expected.set_style(Rect::new(3, 2, 40, 1), config.theme.table_header_style());
 
