@@ -159,7 +159,7 @@ where
         match NCReqDataMessageSystemMessageMap::deserialize(deserializer)? {
             NCReqDataMessageSystemMessageMap::ParamMap(v) => v, // Ignoring parsing errors
             NCReqDataMessageSystemMessageMap::String(s) => {
-                log::warn!("unkowen System Message {}", s);
+                log::warn!("unknown System Message {}", s);
                 NCReqDataMessageSystemMessage::Nomessage
             }
         },
