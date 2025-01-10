@@ -64,4 +64,8 @@ pub struct ColorPalette {
     /// Foreground for Online Users
     #[toml_example(default = "green")]
     pub user_online: Color,
+
+    /// Borders for popup windows
+    #[toml_example(default = "red")]
+    pub popup_border: Color,
 }
