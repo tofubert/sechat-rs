@@ -30,7 +30,7 @@ impl ChatBox<'_> {
             messages: Vec::new(),
             current_index: 0,
             width: 10,
-            state: TableState::default().with_offset(1).with_selected(0),
+            state: TableState::default().with_offset(0).with_selected(0),
             unread_message_style: config
                 .theme
                 .unread_message_style()
@@ -133,6 +133,7 @@ impl ChatBox<'_> {
     }
 
     pub fn select_last_message(&mut self) {
+        log::trace!("messages length: {}", self.messages.len());
         self.current_index = self.messages.len().saturating_sub(1);
         self.state.select(Some(self.current_index));
     }
