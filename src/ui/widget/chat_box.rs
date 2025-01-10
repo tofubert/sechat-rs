@@ -1,7 +1,7 @@
 use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -22,6 +22,7 @@ pub struct ChatBox<'a> {
     default_highlight_style: Style,
     unread_message_style: Style,
     table_header_style: Style,
+    date_format: String,
 }
 
 impl ChatBox<'_> {
@@ -38,6 +39,7 @@ impl ChatBox<'_> {
             default_style: config.theme.default_style(),
             default_highlight_style: config.theme.default_highlight_style(),
             table_header_style: config.theme.table_header_style(),
+            date_format: config.data.ui.date_format.clone(),
         }
     }
 
@@ -59,20 +61,31 @@ impl ChatBox<'_> {
         use std::convert::TryInto;
 
         self.messages.clear();
-        let mut last_date = DateTime::<Utc>::MIN_UTC.format("%Y/%m/%d").to_string();
+        let mut last_date = DateTime::<Utc>::MIN_UTC
+            .format(&self.date_format)
+            .to_string();
         for message_data in backend
             .get_room(current_room)
             .get_messages()
             .values()
             .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
         {
-            let date_str = message_data.get_date_str();
+            let date_str = message_data.get_date_str(&self.date_format);
             if date_str != last_date {
-                let date: Vec<Cell> = vec![
+                let mut date: Vec<Cell> = vec![
                     "".into(),
                     "".into(),
                     Span::styled(date_str.clone(), self.unread_message_style).into(),
                 ];
+                if date_str == Local::now().format(&self.date_format).to_string() {
+                    let today_str = String::from("Today! ");
+                    date = vec![
+                        "".into(),
+                        "".into(),
+                        Span::styled(today_str + date_str.as_str(), self.unread_message_style)
+                            .into(),
+                    ]
+                }
                 self.messages.push(Row::new(date));
                 last_date = date_str;
             }
@@ -290,9 +303,9 @@ mod tests {
 
         let mut expected = Buffer::with_lines([
             "Time  Name                 Message      ",
-            "                           1970/01/01   ",
+            "                           Thursday 01 J",
             "01:33 Hundi                Butz         ",
-            "                           1970/01/03   ",
+            "                           Saturday 03 J",
             "08:33 Stinko               Bert         ",
             "                                        ",
             "                                        ",
@@ -307,14 +320,14 @@ mod tests {
             config.theme.default_highlight_style(),
         );
         expected.set_style(
-            Rect::new(27, 1, 10, 1),
+            Rect::new(27, 1, 13, 1),
             config
                 .theme
                 .default_highlight_style()
                 .add_modifier(Modifier::BOLD),
         );
         expected.set_style(
-            Rect::new(27, 3, 10, 1),
+            Rect::new(27, 3, 13, 1),
             config
                 .theme
                 .unread_message_style()

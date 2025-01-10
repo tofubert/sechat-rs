@@ -21,12 +21,12 @@ impl NCMessage {
         time.format("%H:%M").to_string()
     }
 
-    pub fn get_date_str(&self) -> String {
+    pub fn get_date_str(&self, date_format: &str) -> String {
         let date: DateTime<Local> = DateTime::from(
             DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
                 .expect("cannot convert UTC time stamp"),
         );
-        date.format("%Y/%m/%d").to_string()
+        date.format(date_format).to_string()
     }
 
     /// return opponent display name
