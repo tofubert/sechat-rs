@@ -28,6 +28,7 @@ impl LogBox {
             KeyCode::Char('-') => self.state.transition(TuiWidgetEvent::MinusKey),
             KeyCode::Char('h') => self.state.transition(TuiWidgetEvent::HideKey),
             KeyCode::Char('f') => self.state.transition(TuiWidgetEvent::FocusKey),
+            KeyCode::Char('s') => self.state.transition(TuiWidgetEvent::EscapeKey),
             _ => (),
         }
     }
@@ -51,9 +52,10 @@ impl LogBox {
         frame.render_widget(logger, log_area);
         if area.width > 40 {
             let help_text = Text::from(vec![
-                "Q: Quit | Tab: Switch state | ↑/↓: Select target | f: Focus target".into(),
+                "s: Cancel Scroll | Tab: Switch state | ↑/↓: Select target | f: Focus target"
+                    .into(),
                 "←/→: Display level | +/-: Filter level | Space: Toggle hidden targets".into(),
-                "h: Hide target selector | PageUp/Down: Scroll | Esc: Cancel scroll".into(),
+                "h: Hide target selector | PageUp/Down: Scroll | Esc: Exit this screen".into(),
             ])
             .style(Color::Gray)
             .centered();
