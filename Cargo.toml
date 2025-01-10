@@ -39,7 +39,7 @@ serde_json = "1.0.135"
 jzon = "0.12.5"
 base64 = "0.22.1"
 toml = "0.8.19"
-toml-example = "0.12.0"
+toml-example = "0.12.1"
 ratatui = {version = "0.29.0", features = ["serde"] }
 crossterm = "*"
 tui-tree-widget = "0.23"

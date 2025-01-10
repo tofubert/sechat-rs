@@ -45,3 +45,5 @@ user_offline = "gray"
 # Foreground for Online Users
 user_online = "green"
 
+# Borders for popup windows
+popup_border = "red"

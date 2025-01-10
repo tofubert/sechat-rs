@@ -41,6 +41,21 @@ impl ChatSelector<'_> {
                 )
                 .expect("unread duplicate"),
                 TreeItem::new::<String>(
+                    "favorites".to_string(),
+                    "Favorite Chats".to_string(),
+                    backend
+                        .get_favorite_rooms()
+                        .iter()
+                        .map(|token| {
+                            TreeItem::new_leaf::<String>(
+                                token.to_string(),
+                                backend.get_room(token).get_display_name().into(),
+                            )
+                        })
+                        .collect_vec(),
+                )
+                .expect("favorite room name duplicate"),
+                TreeItem::new::<String>(
                     "direct".to_string(),
                     "DMs".to_string(),
                     backend
@@ -77,6 +92,20 @@ impl ChatSelector<'_> {
                 "Unread Chats".to_string(),
                 backend
                     .get_unread_rooms()
+                    .iter()
+                    .map(|token| {
+                        TreeItem::new_leaf::<String>(
+                            token.to_string(),
+                            backend.get_room(token).get_display_name().into(),
+                        )
+                    })
+                    .collect_vec(),
+            )?,
+            TreeItem::new::<String>(
+                "favorites".to_string(),
+                "Favorite Chats".to_string(),
+                backend
+                    .get_favorite_rooms()
                     .iter()
                     .map(|token| {
                         TreeItem::new_leaf::<String>(
@@ -142,41 +171,39 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn render() {
-        let dir = tempfile::tempdir().unwrap();
-
-        std::env::set_var("HOME", dir.path().as_os_str());
-        let config = init("./test/").unwrap();
-        let mut seq = Sequence::new();
-
-        let mut mock_nc_backend = MockNCTalk::new();
-        let mut mock_room = MockNCRoomInterface::new();
-        let backend = TestBackend::new(40, 10);
-        let mut terminal = Terminal::new(backend).unwrap();
-
+    fn setup_mocks(
+        seq: &mut Sequence,
+        mock_nc_backend: &mut MockNCTalk,
+        mut mock_room: MockNCRoomInterface,
+    ) {
         mock_nc_backend
             .expect_get_unread_rooms()
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
+            .return_const(vec![]);
+
+        mock_nc_backend
+            .expect_get_favorite_rooms()
+            .once()
+            .in_sequence(seq)
             .return_const(vec![]);
 
         mock_nc_backend
             .expect_get_dm_keys_display_name_mapping()
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
             .return_const(vec![]);
 
         mock_nc_backend
             .expect_get_group_keys_display_name_mapping()
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
             .return_const(vec![]);
 
         mock_nc_backend
             .expect_get_unread_rooms()
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
             .return_const(vec![Token::from("0")]);
 
         mock_room
@@ -188,20 +215,42 @@ mod tests {
             .expect_get_room()
             .with(eq(Token::from("0")))
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
             .return_const(mock_room);
+
+        mock_nc_backend
+            .expect_get_favorite_rooms()
+            .once()
+            .in_sequence(seq)
+            .return_const(vec![]);
 
         mock_nc_backend
             .expect_get_dm_keys_display_name_mapping()
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
             .return_const(vec![(Token::from("Butz"), "1".to_string())]);
 
         mock_nc_backend
             .expect_get_group_keys_display_name_mapping()
             .once()
-            .in_sequence(&mut seq)
+            .in_sequence(seq)
             .return_const(vec![(Token::from("Bert"), "2".to_string())]);
+    }
+
+    #[test]
+    fn render() {
+        let dir = tempfile::tempdir().unwrap();
+
+        std::env::set_var("HOME", dir.path().as_os_str());
+        let config = init("./test/").unwrap();
+        let mut seq = Sequence::new();
+
+        let mut mock_nc_backend = MockNCTalk::new();
+        let mock_room = MockNCRoomInterface::new();
+        let backend = TestBackend::new(40, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        setup_mocks(&mut seq, &mut mock_nc_backend, mock_room);
 
         let mut chat_selector_box = ChatSelector::new(&mock_nc_backend, &config);
 
@@ -215,9 +264,9 @@ mod tests {
         let mut expected = Buffer::with_lines([
             "┌Chat Section──────────────────────────┐",
             "│  Unread Chats                        │",
+            "│  Favorite Chats                      │",
             "│  DMs                                 │",
             "│  Group                               │",
-            "│                                      │",
             "│                                      │",
             "│                                      │",
             "│                                      │",
@@ -241,9 +290,9 @@ mod tests {
             "┌Chat Section──────────────────────────┐",
             "│>> ▼ Unread Chats                     │",
             "│       General                        │",
+            "│     Favorite Chats                   │",
             "│   ▶ DMs                              │",
             "│   ▶ Group                            │",
-            "│                                      │",
             "│                                      │",
             "│                                      │",
             "│                                      │",
