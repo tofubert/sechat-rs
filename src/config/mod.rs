@@ -157,54 +157,18 @@ impl Config {
     }
 
     pub fn config_logging(&self) {
-        use log4rs::{
-            append::{
-                console::{ConsoleAppender, Target},
-                file::FileAppender,
-            },
-            config::{Appender, Logger, Root},
-            encode::pattern::PatternEncoder,
-            filter::threshold::ThresholdFilter,
-        };
+        // Set max_log_level to Trace
+        tui_logger::init_logger(log::LevelFilter::Trace).unwrap();
 
-        let log_path = self.strategy.data_dir().join("app.log");
+        // Set default level for unknown targets to Trace
+        tui_logger::set_default_level(log::LevelFilter::Trace);
+        tui_logger::set_level_for_target("reqwest::connect", LevelFilter::Info);
 
-        // Build a stderr logger.
-        let stderr = ConsoleAppender::builder()
-            .encoder(Box::new(PatternEncoder::new("{h({l})} {m}{n}")))
-            .target(Target::Stderr)
-            .build();
-
-        // Logging to log file.
-        let log_file = FileAppender::builder()
-            // Pattern: https://docs.rs/log4rs/*/log4rs/encode/pattern/index.html
-            .encoder(Box::new(PatternEncoder::new(
-                "{d(%H:%M:%S%.3f)} {l} {i} {M}: {m}{n}",
-            )))
-            .append(false)
-            .build(log_path)
-            .unwrap();
-
-        // Log Trace level output to file where trace is the default level
-        // and the programmatically specified level to stderr.
-        let mut config_builder = log4rs::Config::builder()
-            .appender(
-                Appender::builder()
-                    .filter(Box::new(ThresholdFilter::new(log::LevelFilter::Warn)))
-                    .build("stderr", Box::new(stderr)),
-            )
-            .logger(Logger::builder().build("reqwest::connect", LevelFilter::Info));
-        let mut root = Root::builder().appender("stderr");
         if self.data.general.log_to_file {
-            config_builder =
-                config_builder.appender(Appender::builder().build("logfile", Box::new(log_file)));
-            root = root.appender("logfile");
-        }
-        let config = config_builder
-            .build(root.build(log::LevelFilter::Debug))
-            .unwrap();
+            let log_path = self.strategy.data_dir().join("app.log");
 
-        log4rs::init_config(config).expect("Failed to init logging");
+            tui_logger::set_log_file(log_path.to_str().unwrap()).unwrap();
+        }
     }
 }
 

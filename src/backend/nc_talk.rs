@@ -44,6 +44,8 @@ pub trait NCBackend: Debug + Send {
     fn get_room(&self, token: &Token) -> &Self::Room;
     /// Get a list of tokens of rooms with unread messages.
     fn get_unread_rooms(&self) -> Vec<Token>;
+    /// Get a list of tokens of favorite rooms.
+    fn get_favorite_rooms(&self) -> Vec<Token>;
     /// Get a room token by its Displayname.
     fn get_room_by_displayname(&self, name: &str) -> Token;
     /// Get a list of direct messages rooms as token, displayname pairs.
@@ -112,7 +114,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             if let Some(room) = room_option {
                 rooms.insert(name, room);
             } else {
-                log::info!("Encountered a room that cannot be added {} ", name);
+                log::warn!("Encountered a room that cannot be added {} ", name);
             }
         }
     }
@@ -301,7 +303,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         // Open a file in write-only mode, returns `io::Result<File>`
         let mut file = match std::fs::File::create(path) {
             Err(why) => {
-                log::warn!(
+                log::error!(
                     "couldn't create top level log file {}: {}",
                     tmp_path_buf
                         .as_os_str()
@@ -315,7 +317,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         };
 
         if let Err(why) = file.write_all(serde_json::to_string(&data).unwrap().as_bytes()) {
-            log::warn!(
+            log::error!(
                 "couldn't write top level log file to {}: {}",
                 tmp_path_buf
                     .as_os_str()
@@ -337,6 +339,15 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             .sorted_by(std::cmp::Ord::cmp)
             .map(NCRoomInterface::to_token)
             .collect::<Vec<Token>>()
+    }
+
+    fn get_favorite_rooms(&self) -> Vec<Token> {
+        self.rooms
+            .values()
+            .filter(|room| room.is_favorite())
+            .sorted()
+            .map(NCRoomInterface::to_token)
+            .collect()
     }
 
     fn get_room_by_displayname(&self, name: &str) -> Token {
@@ -403,7 +414,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         &mut self,
         token: &Token,
     ) -> Result<Option<(String, usize)>, Box<dyn Error>> {
-        log::debug!("key {}", token);
+        log::debug!("selected room {}", token);
         self.rooms
             .get_mut(token)
             .ok_or_else(|| format!("Failed to get Room ref for room selection: {token}."))?
@@ -511,6 +522,7 @@ mock! {
         fn write_to_log(&mut self) -> Result<(), std::io::Error>;
         fn get_room(&self, token: &Token) -> &<MockNCTalk as NCBackend>::Room;
         fn get_unread_rooms(&self) -> Vec<Token>;
+        fn get_favorite_rooms(&self) -> Vec<Token>;
         fn get_room_by_displayname(&self, name: &str) -> Token;
         fn get_dm_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
         fn get_group_keys_display_name_mapping(&self) -> Vec<(Token, String)>;
