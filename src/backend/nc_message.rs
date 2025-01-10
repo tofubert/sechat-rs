@@ -1,4 +1,9 @@
-use super::nc_request::{NCReqDataMessage, NCReqDataMessageSystemMessage, NCReqDataMessageType};
+use std::collections::HashMap;
+
+use super::nc_request::{
+    NCReqDataMessage, NCReqDataMessageParameter, NCReqDataMessageSystemMessage,
+    NCReqDataMessageType,
+};
 use chrono::prelude::*;
 
 /// `NextCloud` message interface
@@ -40,14 +45,17 @@ impl NCMessage {
     }
 
     /// return the message itself
-    pub fn get_message(&self) -> String {
-        let mut output = self.0.message.clone();
-        if !self.0.messageParameters.is_empty() {
-            for (key, value) in self.0.messageParameters.clone() {
-                output = output.replace(&key, &value.name);
-            }
+    pub fn get_message(&self) -> &str {
+        &self.0.message
+    }
+
+    /// return Message Params
+    pub fn get_message_params(&self) -> Option<&HashMap<String, NCReqDataMessageParameter>> {
+        if self.0.messageParameters.is_empty() {
+            None
+        } else {
+            Some(&self.0.messageParameters)
         }
-        output
     }
 
     /// get list of reactions as comma separated string

@@ -1,7 +1,9 @@
+use crate::backend::nc_message::NCMessage;
 use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
 use chrono::{DateTime, Local, Utc};
+use itertools::Itertools;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -60,16 +62,21 @@ impl ChatBox<'_> {
         use itertools::Itertools;
         use std::convert::TryInto;
 
+        // Remove all previous messages.
         self.messages.clear();
+
         let mut last_date = DateTime::<Utc>::MIN_UTC
             .format(&self.date_format)
             .to_string();
+
+        // iterate over all messages.
         for message_data in backend
             .get_room(current_room)
             .get_messages()
             .values()
             .filter(|mes| !mes.is_reaction() && !mes.is_edit_note() && !mes.is_comment_deleted())
         {
+            // Create the Date Section.
             let date_str = message_data.get_date_str(&self.date_format);
             if date_str != last_date {
                 let mut date: Vec<Cell> = vec![
@@ -90,6 +97,7 @@ impl ChatBox<'_> {
                 last_date = date_str;
             }
 
+            // Create the name Section.
             let name = textwrap::wrap(
                 message_data.get_name().to_string().as_str(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
@@ -99,49 +107,29 @@ impl ChatBox<'_> {
             .map(Line::from)
             .collect_vec();
 
-            let message_string = message_data
-                .get_message()
-                .split('\n')
-                .flat_map(|cell| {
-                    textwrap::wrap(cell, self.width as usize)
-                        .into_iter()
-                        .map(std::borrow::Cow::into_owned)
-                        .map(Line::from)
-                        .collect_vec()
-                })
-                .collect_vec();
+            // Format the message
+            let message_string = self.format_message(message_data);
 
+            // figure out how high this Row needs to be.
             let row_height: u16 = if message_string.len() > name.len() {
                 message_string.len().try_into().expect("message too long")
             } else {
                 name.len().try_into().expect("name too long")
             };
+            // Put all 3 parts into Line Vector.
             let message: Vec<Cell> = vec![
                 message_data.get_time_str().into(),
                 name.into(),
                 message_string.into(),
             ];
 
+            // Add Message to Messages Vector
             self.messages.push(Row::new(message).height(row_height));
 
-            if message_data.has_reactions() {
-                let reaction: Vec<Cell> = vec![
-                    "".into(),
-                    "".into(),
-                    message_data.get_reactions_str().into(),
-                ];
-                self.messages.push(Row::new(reaction));
-            }
-            if backend.get_room(current_room).has_unread()
-                && backend.get_room(current_room).get_last_read() == message_data.get_id()
-            {
-                let unread_marker: Vec<Cell> = vec![
-                    "".into(),
-                    "".into(),
-                    Span::styled("+++ LAST READ +++", self.unread_message_style).into(),
-                ];
-                self.messages.push(Row::new(unread_marker));
-            }
+            // If Message has Reactions we add those as the next line.
+            self.insert_reaction_if_needed(message_data);
+
+            self.insert_unread_marker_if_needed(backend, current_room, message_data);
         }
     }
 
@@ -184,6 +172,56 @@ impl ChatBox<'_> {
         //     .try_into()?;
         // Ok(())
         todo!("commented code missing?");
+    }
+
+    /// check if the Room has unread messages and if so insert the Unread Marker.
+    fn insert_unread_marker_if_needed(
+        &mut self,
+        backend: &impl NCBackend,
+        current_room: &Token,
+        message_data: &NCMessage,
+    ) {
+        if backend.get_room(current_room).has_unread()
+            && backend.get_room(current_room).get_last_read() == message_data.get_id()
+        {
+            let unread_marker: Vec<Cell> = vec![
+                "".into(),
+                "".into(),
+                Span::styled("+++ LAST READ +++", self.unread_message_style).into(),
+            ];
+            self.messages.push(Row::new(unread_marker));
+        }
+    }
+
+    /// Push a line with the reactions of the Message into the message vector.
+    fn insert_reaction_if_needed(&mut self, message_data: &NCMessage) {
+        if message_data.has_reactions() {
+            let reaction: Vec<Cell> = vec![
+                "".into(),
+                "".into(),
+                message_data.get_reactions_str().into(),
+            ];
+            self.messages.push(Row::new(reaction));
+        }
+    }
+
+    fn format_message<'a>(&mut self, message_data: &NCMessage) -> Vec<Line<'a>> {
+        let mut message_text = message_data.get_message().to_string();
+        if let Some(params) = message_data.get_message_params() {
+            for (key, value) in params {
+                message_text = message_text.replace(key, &value.name);
+            }
+        }
+        message_text
+            .split('\n')
+            .flat_map(|cell| {
+                textwrap::wrap(cell, self.width as usize)
+                    .into_iter()
+                    .map(std::borrow::Cow::into_owned)
+                    .map(Line::from)
+                    .collect_vec()
+            })
+            .collect_vec()
     }
 }
 
