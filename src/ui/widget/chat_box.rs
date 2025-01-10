@@ -217,7 +217,9 @@ mod tests {
     use std::collections::BTreeMap;
 
     use crate::backend::nc_message::NCMessage;
-    use crate::backend::nc_request::{NCReqDataMessage, NCReqDataParticipants};
+    use crate::backend::nc_request::{
+        NCReqDataMessage, NCReqDataMessageType, NCReqDataParticipants,
+    };
     use crate::backend::nc_room::MockNCRoomInterface;
     use crate::backend::nc_talk::MockNCTalk;
     use crate::config::init;
@@ -240,7 +242,7 @@ mod tests {
         let mock_message_1 = NCMessage::from(NCReqDataMessage {
             id: 0,
             message: "Butz".to_string(),
-            messageType: "comment".to_string(),
+            messageType: NCReqDataMessageType::Comment,
             actorDisplayName: "Hundi".to_string(),
             timestamp: timestamp_1.timestamp(),
             ..Default::default()
@@ -249,7 +251,7 @@ mod tests {
         let mock_message_2 = NCMessage::from(NCReqDataMessage {
             id: 1,
             message: "Bert".to_string(),
-            messageType: "comment".to_string(),
+            messageType: NCReqDataMessageType::Comment,
             actorDisplayName: "Stinko".to_string(),
             timestamp: timestamp_2.timestamp(),
             ..Default::default()

@@ -20,7 +20,8 @@ pub struct NCReqDataMessage {
     pub timestamp: i64,
     #[serde(deserialize_with = "sys_Message")]
     pub systemMessage: NCReqDataMessageSystemMessage,
-    pub messageType: String,
+    #[serde(deserialize_with = "message_type")]
+    pub messageType: NCReqDataMessageType,
     pub isReplyable: bool,
     pub referenceId: String,
     pub message: String,
@@ -45,7 +46,8 @@ pub struct NCReqDataMessageParent {
     pub timestamp: i32,
     #[serde(deserialize_with = "sys_Message")]
     pub systemMessage: NCReqDataMessageSystemMessage,
-    pub messageType: String,
+    #[serde(deserialize_with = "message_type")]
+    pub messageType: NCReqDataMessageType,
     pub isReplyable: bool,
     pub referenceId: String,
     pub message: String,
@@ -164,4 +166,40 @@ where
             }
         },
     )
+}
+
+/// Message Type defined in [NCTalk API](<https://nextcloud-talk.readthedocs.io/en/stable/chat/#receive-chat-messages-of-a-conversation>)
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Display)]
+pub enum NCReqDataMessageType {
+    #[default]
+    #[serde(rename = "")]
+    Unknown,
+    #[serde(rename = "comment")]
+    Comment,
+    #[serde(rename = "comment_deleted")]
+    CommentDeleted,
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "command")]
+    Command,
+}
+
+fn message_type<'de, D>(deserializer: D) -> Result<NCReqDataMessageType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NCReqDataMessageTypeMap {
+        ParamMap(NCReqDataMessageType),
+        String(String),
+    }
+
+    Ok(match NCReqDataMessageTypeMap::deserialize(deserializer)? {
+        NCReqDataMessageTypeMap::ParamMap(v) => v, // Ignoring parsing errors
+        NCReqDataMessageTypeMap::String(s) => {
+            log::warn!("unknown Message type {}", s);
+            NCReqDataMessageType::Unknown
+        }
+    })
 }
