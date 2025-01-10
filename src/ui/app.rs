@@ -77,7 +77,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
 
         Self {
             current_screen: CurrentScreen::Reading,
-            title: TitleBar::new(CurrentScreen::Reading, init_room.clone(), config),
+            title: TitleBar::new(CurrentScreen::Reading, config),
             selector: ChatSelector::new(&backend, config),
             input: InputBox::new("", config),
             chat: {

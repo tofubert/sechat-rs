@@ -11,9 +11,7 @@ use ratatui::{
 use style::Styled;
 
 pub struct TitleBar<'a> {
-    room: String,
-    status: Option<String>,
-    status_text: Option<String>,
+    title: Line<'a>,
     user_away_style: Style,
     user_dnd_style: Style,
     user_online_style: Style,
@@ -27,11 +25,9 @@ pub struct TitleBar<'a> {
 }
 
 impl TitleBar<'_> {
-    pub fn new(initial_state: CurrentScreen, room: String, config: &Config) -> Self {
+    pub fn new(initial_state: CurrentScreen, config: &Config) -> Self {
         TitleBar {
-            room,
-            status: None,
-            status_text: None,
+            title: Line::from(vec![]),
             user_away_style: config.theme.user_away_style(),
             user_dnd_style: config.theme.user_dnd_style(),
             user_online_style: config.theme.user_online_style(),
@@ -53,25 +49,26 @@ impl TitleBar<'_> {
     ) {
         self.mode = screen.to_string();
         let room = backend.get_room(current_room);
-        self.room = room.to_string();
+        let room_name = room.get_display_name();
+        let mut status = None;
+        let mut status_text = None;
         if room.is_dm() {
             let user = room
                 .get_users()
                 .iter()
                 .find(|user| user.displayName == room.get_display_name());
             if user.is_none() {
-                log::warn!("Could not find user associated with this DM");
+                log::error!("Could not find user associated with this DM");
             }
-            self.status = user.and_then(|user| user.status.clone());
-            self.status_text =
-                user.and_then(|user| match (&user.statusIcon, &user.statusMessage) {
-                    (None, None) => None,
-                    (None, Some(msg)) => Some(msg.to_string()),
-                    (Some(icon), None) => Some(icon.to_string()),
-                    (Some(icon), Some(msg)) => Some(format!("{icon} {msg}")),
-                });
+            status = user.and_then(|user| user.status.clone());
+            status_text = user.and_then(|user| match (&user.statusIcon, &user.statusMessage) {
+                (None, None) => None,
+                (None, Some(msg)) => Some(msg.to_string()),
+                (Some(icon), None) => Some(icon.to_string()),
+                (Some(icon), Some(msg)) => Some(format!("{icon} {msg}")),
+            });
         }
-        self.unread = backend.get_room(current_room).get_unread();
+        self.unread = room.get_unread();
         let unread_array: Vec<String> = backend
             .get_unread_rooms()
             .iter()
@@ -86,21 +83,12 @@ impl TitleBar<'_> {
             Text::raw("UNREAD: ".to_owned() + unread_array.join(", ").as_str())
                 .set_style(self.title_important_style)
         };
-    }
-
-    pub fn render_area(&self, frame: &mut Frame, area: Rect) {
-        frame.render_widget(self, area);
-    }
-}
-
-impl Widget for &TitleBar<'_> {
-    fn render(self, area: Rect, buf: &mut Buffer) {
         let header = if self.unread > 0 {
             format!("Current({}): ", self.unread)
         } else {
             "Current: ".to_string()
         };
-        let room_style = if let Some(status) = &self.status {
+        let room_style = if let Some(status) = &status {
             match status.as_str() {
                 "away" => self.user_away_style,
                 "offline" => self.user_offline_style,
@@ -114,22 +102,29 @@ impl Widget for &TitleBar<'_> {
         } else {
             self.title_style
         };
-        let mut title_length = header.len() + self.room.len();
         let mut title_spans = vec![
             Span::styled(header, self.title_style),
-            Span::styled(&self.room, room_style),
+            Span::styled(room_name.to_owned(), room_style),
         ];
 
-        if let Some(status_text) = &self.status_text {
+        if let Some(status_text) = &status_text {
             let status_text = format!(" ({status_text})");
-            title_length += status_text.len();
             title_spans.push(Span::styled(status_text, self.title_style));
         }
+        self.title = Line::from(title_spans);
+    }
 
+    pub fn render_area(&self, frame: &mut Frame, area: Rect) {
+        frame.render_widget(self, area);
+    }
+}
+
+impl Widget for &TitleBar<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
         let title_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Min(title_length.as_()),
+                Constraint::Min(self.title.to_string().len().as_()),
                 Constraint::Fill(1),
                 Constraint::Percentage(20),
             ])
@@ -139,7 +134,7 @@ impl Widget for &TitleBar<'_> {
             .borders(Borders::BOTTOM)
             .style(self.default_style);
 
-        Paragraph::new(Line::from(title_spans))
+        Paragraph::new(self.title.clone())
             .block(title_block)
             .render(title_layout[0], buf);
 
@@ -183,7 +178,6 @@ mod tests {
         let mut mock_nc_backend = MockNCTalk::new();
         let backend = TestBackend::new(60, 3);
         let mut terminal = Terminal::new(backend).unwrap();
-        let mut bar = TitleBar::new(CurrentScreen::Reading, "General".to_string(), &config);
 
         let mut mock_room = MockNCRoomInterface::new();
         let mut dummy_user = NCReqDataParticipants::default();
@@ -202,8 +196,10 @@ mod tests {
             .return_const(vec![]);
         mock_nc_backend
             .expect_get_room()
-            .times(2)
+            .once()
             .return_const(mock_room);
+
+        let mut bar = TitleBar::new(CurrentScreen::Reading, &config);
         bar.update(CurrentScreen::Reading, &mock_nc_backend, &"123".to_string());
 
         terminal
