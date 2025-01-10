@@ -16,4 +16,7 @@ pub struct Ui {
     pub use_mouse: bool,
     #[toml_example(default = true)]
     pub use_paste: bool,
+    /// For available format options see <https://docs.rs/chrono/latest/chrono/format/strftime/index.html>
+    #[toml_example(default = "%A %d %B %Y")]
+    pub date_format: String,
 }
