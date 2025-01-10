@@ -79,38 +79,69 @@ where
     )
 }
 
+/// System Messages in NC dont seem to have a collected global state, but seem to be defined by anyone and everyone.
+///
+/// This is collected and greped out of various log files and the spreed source code.
+/// Please help extend this.
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Display)]
 pub enum NCReqDataMessageSystemMessage {
     #[default]
     #[serde(rename = "")]
-    nomessage,
-    message_edited,
-    message_deleted,
-    reaction,
-    reaction_revoked,
-    reaction_deleted,
-    history_cleared,
-    poll_voted,
-    poll_closed,
-    call_started,
-    call_ended,
-    call_ended_everyone,
-    call_missed,
-    call_joined,
-    call_left,
-    user_removed,
-    user_added,
-    avatar_set,
-    conversation_renamed,
-    conversation_created,
-    read_only,
-    listable_none,
-    group_added,
-    moderator_promoted,
-    matterbridge_config_enabled,
-    matterbridge_config_disabled,
-    matterbridge_config_edited,
-    i_am_the_system,
+    Nomessage,
+    #[serde(rename = "message_edited")]
+    MessageEdited,
+    #[serde(rename = "message_deleted")]
+    MessageDeleted,
+    #[serde(rename = "reaction")]
+    Reaction,
+    #[serde(rename = "reaction_revoked")]
+    ReactionRevoked,
+    #[serde(rename = "reaction_deleted")]
+    ReactionDeleted,
+    #[serde(rename = "history_cleared")]
+    HistoryCleared,
+    #[serde(rename = "poll_voted")]
+    PollVoted,
+    #[serde(rename = "poll_closed")]
+    PollClosed,
+    #[serde(rename = "call_started")]
+    CallStarted,
+    #[serde(rename = "call_ended")]
+    CallEnded,
+    #[serde(rename = "call_ended_everyone")]
+    CallEndedEveryone,
+    #[serde(rename = "call_missed")]
+    CallMissed,
+    #[serde(rename = "call_joined")]
+    CallJoined,
+    #[serde(rename = "call_left")]
+    CallLeft,
+    #[serde(rename = "user_removed")]
+    UserRemoved,
+    #[serde(rename = "user_added")]
+    UserAdded,
+    #[serde(rename = "avatar_set")]
+    AvatarSet,
+    #[serde(rename = "conversation_renamed")]
+    ConversationRenamed,
+    #[serde(rename = "conversation_created")]
+    ConversationCreated,
+    #[serde(rename = "read_only")]
+    ReadOnly,
+    #[serde(rename = "listable_none")]
+    ListableNone,
+    #[serde(rename = "group_added")]
+    GroupAdded,
+    #[serde(rename = "moderator_promoted")]
+    ModeratorPromoted,
+    #[serde(rename = "matterbridge_config_enabled")]
+    MatterbridgeConfigEnabled,
+    #[serde(rename = "matterbridge_config_disabled")]
+    MatterbridgeConfigDisabled,
+    #[serde(rename = "matterbridge_config_edited")]
+    MatterbridgeConfigEdited,
+    #[serde(rename = "i_am_the_system")]
+    IAmTheSystem,
 }
 
 fn sys_Message<'de, D>(deserializer: D) -> Result<NCReqDataMessageSystemMessage, D::Error>
@@ -129,7 +160,7 @@ where
             NCReqDataMessageSystemMessageMap::ParamMap(v) => v, // Ignoring parsing errors
             NCReqDataMessageSystemMessageMap::String(s) => {
                 log::warn!("unkowen System Message {}", s);
-                NCReqDataMessageSystemMessage::nomessage
+                NCReqDataMessageSystemMessage::Nomessage
             }
         },
     )

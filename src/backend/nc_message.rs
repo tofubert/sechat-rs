@@ -73,19 +73,19 @@ impl NCMessage {
 
     /// return `true` if message is an edited message
     pub fn is_edit_note(&self) -> bool {
-        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::message_edited
+        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::MessageEdited
     }
 
     pub fn is_revoked(&self) -> bool {
         self.is_system()
-            && (self.0.systemMessage == NCReqDataMessageSystemMessage::message_deleted
-                || self.0.systemMessage == NCReqDataMessageSystemMessage::reaction_revoked
-                || self.0.systemMessage == NCReqDataMessageSystemMessage::reaction_deleted)
+            && (self.0.systemMessage == NCReqDataMessageSystemMessage::MessageDeleted
+                || self.0.systemMessage == NCReqDataMessageSystemMessage::ReactionRevoked
+                || self.0.systemMessage == NCReqDataMessageSystemMessage::ReactionDeleted)
     }
 
     /// return `true` if message is a reaction
     pub fn is_reaction(&self) -> bool {
-        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::reaction
+        self.is_system() && self.0.systemMessage == NCReqDataMessageSystemMessage::Reaction
     }
 
     /// return `true` if message is a command
