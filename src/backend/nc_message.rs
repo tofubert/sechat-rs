@@ -21,6 +21,7 @@ impl NCMessage {
         time.format("%H:%M").to_string()
     }
 
+    /// return message date as string with given format
     pub fn get_date_str(&self, date_format: &str) -> String {
         let date: DateTime<Local> = DateTime::from(
             DateTime::<Utc>::from_timestamp(self.0.timestamp, 0)
