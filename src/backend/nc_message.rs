@@ -41,6 +41,7 @@ impl NCMessage {
 
     /// return the message itself
     pub fn get_message(&self) -> &str {
+        if !self.0.messageParameters.is_empty() {}
         &self.0.message
     }
 

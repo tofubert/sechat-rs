@@ -4,8 +4,9 @@ use strum::Display;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessageParameter {
+    #[serde(deserialize_with = "message_param_type")]
     #[serde(rename = "type")]
-    param_type: String,
+    param_type: NCReqDataMessageParameterType,
     id: String,
     name: String,
 }
@@ -202,4 +203,42 @@ where
             NCReqDataMessageType::Unknown
         }
     })
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub enum NCReqDataMessageParameterType {
+    #[default]
+    Unknown,
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "file")]
+    File,
+    #[serde(rename = "group")]
+    Group,
+    #[serde(rename = "call")]
+    Call,
+    #[serde(rename = "guest")]
+    Guest,
+}
+
+fn message_param_type<'de, D>(deserializer: D) -> Result<NCReqDataMessageParameterType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NCReqDataMessageParamTypeMap {
+        ParamMap(NCReqDataMessageParameterType),
+        String(String),
+    }
+
+    Ok(
+        match NCReqDataMessageParamTypeMap::deserialize(deserializer)? {
+            NCReqDataMessageParamTypeMap::ParamMap(v) => v, // Ignoring parsing errors
+            NCReqDataMessageParamTypeMap::String(s) => {
+                log::warn!("unknown Message Param type {}", s);
+                NCReqDataMessageParameterType::Unknown
+            }
+        },
+    )
 }
