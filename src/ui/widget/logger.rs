@@ -7,12 +7,14 @@ use tui_logger::{TuiLoggerLevelOutput, TuiLoggerSmartWidget, TuiWidgetEvent, Tui
 #[derive(Default)]
 pub struct LogBox {
     state: TuiWidgetState,
+    style: Style,
 }
 
 impl LogBox {
-    pub fn new(_config: &Config) -> Self {
+    pub fn new(config: &Config) -> Self {
         LogBox {
             state: TuiWidgetState::new().set_default_display_level(LevelFilter::Info),
+            style: config.theme.default_style(),
         }
     }
     pub fn handle_ui_event(&mut self, key: KeyEvent) {
@@ -37,11 +39,12 @@ impl LogBox {
             Layout::vertical([Constraint::Fill(50), Constraint::Length(3)]).areas(area);
 
         let logger = TuiLoggerSmartWidget::default()
-            .style_error(Style::default().fg(Color::Red))
-            .style_debug(Style::default().fg(Color::Green))
-            .style_warn(Style::default().fg(Color::Yellow))
-            .style_trace(Style::default().fg(Color::Magenta))
-            .style_info(Style::default().fg(Color::Cyan))
+            .style_error(self.style.fg(Color::Red))
+            .style_debug(self.style.fg(Color::Green))
+            .style_warn(self.style.fg(Color::Yellow))
+            .style_trace(self.style.fg(Color::Magenta))
+            .style_info(self.style.fg(Color::Cyan))
+            .style(self.style)
             .output_separator(':')
             .output_timestamp(Some("%H:%M:%S%.3f".to_string()))
             .output_level(Some(TuiLoggerLevelOutput::Abbreviated))
@@ -57,7 +60,7 @@ impl LogBox {
                 "←/→: Display level | +/-: Filter level | Space: Toggle hidden targets".into(),
                 "h: Hide target selector | PageUp/Down: Scroll | Esc: Exit this screen".into(),
             ])
-            .style(Color::Gray)
+            .style(self.style)
             .centered();
             frame.render_widget(help_text, help_area);
         }
