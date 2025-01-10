@@ -6,9 +6,11 @@ use super::{
     },
 };
 use async_trait::async_trait;
+use itertools::Itertools;
 use log;
 use num_derive::FromPrimitive;
 use num_traits::{AsPrimitive, FromPrimitive};
+use std::collections::BTreeMap;
 use std::fmt::{Debug, Display};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -50,7 +52,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     /// Check if this Room is a Group Chat.
     fn is_group(&self) -> bool;
     /// Get a Vector of all the messages in the room.
-    fn get_messages(&self) -> &Vec<NCMessage>;
+    fn get_messages(&self) -> &BTreeMap<i32, NCMessage>;
     /// Get how many messages are unread.
     fn get_unread(&self) -> usize;
     /// Check if this Room is a favorite.
@@ -98,14 +100,18 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
         &self,
         requester: Arc<tokio::sync::Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    async fn fill_history<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &mut self,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
+    ) -> Result<(), Box<dyn std::error::Error>>;
 }
 
 /// Real implementation of the `NCRoom`.
 /// Holds its Messages, Participants, Raw Data and Path to write its log to.
 #[derive(Debug, Default)]
 pub struct NCRoom {
-    /// Vector of all its messages.
-    pub messages: Vec<NCMessage>,
+    /// ``BTreeMap`` of all its messages.
+    pub messages: BTreeMap<i32, NCMessage>,
     /// Raw Data of this Room.
     room_data: NCReqDataRoom,
     /// Path to write json output to.
@@ -129,13 +135,15 @@ impl NCRoom {
         tmp_path_buf.push(room_data.token.as_str());
         let path = tmp_path_buf.as_path();
 
-        let mut messages = Vec::<NCMessage>::new();
+        let mut messages = BTreeMap::<i32, NCMessage>::new();
 
         if path.exists() && path.is_file() {
             if let Ok(data) = serde_json::from_str::<Vec<NCReqDataMessage>>(
                 std::fs::read_to_string(path).unwrap().as_str(),
             ) {
-                messages.extend(data.into_iter().map(Into::into));
+                for message in data {
+                    messages.insert(message.id, message.into());
+                }
             } else {
                 log::debug!(
                     "Failed to parse json for {}, falling back to fetching",
@@ -167,7 +175,7 @@ impl NCRoom {
     async fn fetch_messages<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         requester: Arc<Mutex<Requester>>,
         token: &Token,
-        messages: &mut Vec<NCMessage>,
+        messages: &mut BTreeMap<i32, NCMessage>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let response_onceshot = {
             requester
@@ -182,9 +190,43 @@ impl NCRoom {
             .expect("Failed for fetch chat update")
             .expect("Failed request");
         for message in response {
-            messages.push(message.into());
+            messages.insert(message.id, message.into());
         }
         Ok(())
+    }
+
+    async fn fetch_message_subset<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        first: i32,
+        last: i32,
+        requester: Arc<Mutex<Requester>>,
+        token: &Token,
+    ) -> BTreeMap<i32, NCMessage> {
+        let mut fetch_key = first;
+        let mut messages = BTreeMap::new();
+        while fetch_key <= last && fetch_key >= 0 {
+            let response_onceshot = {
+                requester
+                    .lock()
+                    .await
+                    .request_chat_update(token, 200, fetch_key)
+                    .await
+                    .unwrap()
+            };
+            let response = response_onceshot
+                .await
+                .expect("Failed for fetch chat update")
+                .expect("Failed request");
+            if response.is_empty() {
+                log::debug!("No Messages found aborting {}", fetch_key);
+                break;
+            }
+            fetch_key = response.last().expect("No Messages fetched").id;
+
+            for message in response {
+                messages.insert(message.id, message.into());
+            }
+        }
+        messages
     }
 }
 
@@ -193,7 +235,7 @@ impl NCRoomInterface for NCRoom {
     // the room endpoint doesnt tell you about reactions...
     fn get_last_room_level_message_id(&self) -> Option<i32> {
         self.messages
-            .iter()
+            .values()
             .filter(|&message| !message.is_reaction() && !message.is_edit_note())
             .collect::<Vec<&NCMessage>>()
             .last()
@@ -225,7 +267,7 @@ impl NCRoomInterface for NCRoom {
         &self.room_type
     }
 
-    fn get_messages(&self) -> &Vec<NCMessage> {
+    fn get_messages(&self) -> &BTreeMap<i32, NCMessage> {
         &self.messages
     }
 
@@ -259,7 +301,7 @@ impl NCRoomInterface for NCRoom {
     fn write_to_log(&mut self) -> Result<(), std::io::Error> {
         use std::io::Write;
 
-        let data: Vec<_> = self.messages.iter().map(NCMessage::data).collect();
+        let data: Vec<_> = self.messages.values().map(NCMessage::data).collect();
         let path = self.path_to_log.as_path();
         // Open a file in write-only mode, returns `io::Result<File>`
         let mut file = match std::fs::File::create(path) {
@@ -334,7 +376,16 @@ impl NCRoomInterface for NCRoom {
                 .request_chat_update(
                     &self.room_data.token,
                     200,
-                    self.messages.last().unwrap().get_id(),
+                    self.messages
+                        .get(
+                            self.messages
+                                .keys()
+                                .sorted()
+                                .last()
+                                .expect("Failed to sort messages by its keys."),
+                        )
+                        .ok_or("No last message")?
+                        .get_id(),
                 )
                 .await
                 .unwrap()
@@ -355,7 +406,7 @@ impl NCRoomInterface for NCRoom {
             );
         }
         for message in response {
-            self.messages.push(message.into());
+            self.messages.insert(message.id, message.into());
         }
         let response_onceshot = {
             requester
@@ -388,7 +439,16 @@ impl NCRoomInterface for NCRoom {
                     .await
                     .request_mark_chat_read(
                         &self.room_data.token,
-                        self.messages.last().ok_or("No last message")?.get_id(),
+                        self.messages
+                            .get(
+                                self.messages
+                                    .keys()
+                                    .sorted()
+                                    .last()
+                                    .expect("Failed to sort messages by its keys."),
+                            )
+                            .ok_or("No last message")?
+                            .get_id(),
                     )
                     .await
                     .unwrap()
@@ -430,6 +490,73 @@ impl NCRoomInterface for NCRoom {
                 Ordering::Equal => (),
             }
         }
+        Ok(())
+    }
+
+    async fn fill_history<Requester: NCRequestInterface + 'static + std::marker::Sync>(
+        &mut self,
+        requester: Arc<tokio::sync::Mutex<Requester>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let response_onceshot = {
+            requester
+                .lock()
+                .await
+                .request_chat_update(&self.room_data.token, 200, 1)
+                .await
+                .unwrap()
+        };
+        let response = response_onceshot
+            .await
+            .expect("Failed for fetch chat update")
+            .expect("Failed request");
+
+        // Room is empty.
+        if response.is_empty() {
+            return Ok(());
+        }
+
+        let fetch_key = response
+            .first()
+            .expect("Failed to get last message of initial fetch")
+            .id;
+
+        let last_entry = *(self
+            .messages
+            .last_key_value()
+            .expect("Failed to sort messages by its keys.")
+            .0);
+
+        log::debug!(
+            "Fetching Full history. Size stored {}, size to check {}, last {}, first {}",
+            self.messages.len(),
+            last_entry - fetch_key,
+            last_entry,
+            fetch_key
+        );
+        let mut running_key = fetch_key + 10_000;
+        let mut thread_handles = vec![];
+        for key in (fetch_key..=last_entry).step_by(10_000) {
+            log::debug!("Fetching thread {} to {} ", key, running_key);
+            let token = self.room_data.token.clone();
+            let cloned_requester = requester.clone();
+            thread_handles.push(tokio::spawn(async move {
+                NCRoom::fetch_message_subset(key, running_key, cloned_requester, &token).await
+            }));
+            running_key += 10_000;
+        }
+        log::debug!("Spawned all reads for fetching");
+        for handle in thread_handles {
+            let mut results = handle.await.expect("No Messages could be fetched.");
+            self.messages.append(&mut results);
+        }
+
+        log::debug!(
+            "Updated Full history. Size {}, last {}, first {}",
+            self.messages.len(),
+            last_entry,
+            fetch_key
+        );
+
         Ok(())
     }
 }

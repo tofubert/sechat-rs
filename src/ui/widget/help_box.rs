@@ -34,7 +34,7 @@ impl Widget for &HelpBox {
                     Row::new(["q", "quit", "enter the quit screen."]),
                     Row::new(["o", "open", "enter the chat selection screen."]),
                     Row::new(["u", "users sidebar", "Toggle whether the users are shown in a chat sidebar. Available in reading mode."]),
-
+                    Row::new(["f", "fetch history", "Force a full history fetch of the current chat. Might take some time!"]),
                     Row::new(["?", "help", "enter this help screen."]),
                     Row::new([
                         "m",
@@ -96,7 +96,7 @@ mod tests {
         std::env::set_var("HOME", dir.path().as_os_str());
         let config = init("./test/").unwrap();
 
-        let backend = TestBackend::new(46, 14);
+        let backend = TestBackend::new(46, 15);
         let mut terminal = Terminal::new(backend).unwrap();
         let help_box = HelpBox::new(&config);
 
@@ -104,7 +104,7 @@ mod tests {
         dummy_user.displayName = "Butz".to_string();
 
         terminal
-            .draw(|frame| help_box.render_area(frame, Rect::new(0, 0, 46, 14)))
+            .draw(|frame| help_box.render_area(frame, Rect::new(0, 0, 46, 15)))
             .unwrap();
 
         let mut expected = Buffer::with_lines([
@@ -114,6 +114,7 @@ mod tests {
             "│  q     quit                 enter the qui  │",
             "│  o     open                 enter the cha  │",
             "│  u     users sidebar        Toggle whethe  │",
+            "│  f     fetch history        Force a full   │",
             "│  ?     help                 enter this he  │",
             "│  m     mark as read         mark current   │",
             "│  (e|i) edit                 enter the edi  │",
@@ -123,9 +124,9 @@ mod tests {
             "│                                            │",
             "└────────────────────────────────────────────┘",
         ]);
-        expected.set_style(Rect::new(0, 0, 46, 14), config.theme.popup_border_style());
+        expected.set_style(Rect::new(0, 0, 46, 15), config.theme.popup_border_style());
 
-        expected.set_style(Rect::new(1, 1, 44, 12), config.theme.default_style());
+        expected.set_style(Rect::new(1, 1, 44, 13), config.theme.default_style());
 
         expected.set_style(Rect::new(3, 2, 40, 1), config.theme.table_header_style());
 

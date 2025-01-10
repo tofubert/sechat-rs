@@ -194,19 +194,20 @@ impl NCRequest {
                     buffer.push(rx.recv().await.expect("Failed to get message"));
                 }
 
-                while worker_queue
+                if worker_queue
                     .first()
                     .expect("No Element in worker queue")
                     .capacity()
                     < 5
                 {
-                    worker_queue.sort_by_key(tokio::sync::mpsc::Sender::capacity);
+                    log::trace!(
+                        "Capacity of first {} and last {} worker. Rotating",
+                        worker_queue.first().unwrap().capacity(),
+                        worker_queue.last().unwrap().capacity()
+                    );
+                    worker_queue.rotate_right(1);
                 }
-                log::trace!(
-                    "Capacity of first {} and last {} worker",
-                    worker_queue.first().unwrap().capacity(),
-                    worker_queue.last().unwrap().capacity()
-                );
+
                 for message in buffer {
                     worker_queue
                         .first()
