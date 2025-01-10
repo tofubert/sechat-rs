@@ -295,7 +295,6 @@ mod tests {
         terminal.backend().assert_buffer(&expected);
 
         chat_box.update_messages(&mock_nc_backend, &"123".to_string());
-        // chat_box.select_last_message();
 
         terminal
             .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
