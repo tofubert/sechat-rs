@@ -6,9 +6,9 @@ use strum::Display;
 pub struct NCReqDataMessageParameter {
     #[serde(deserialize_with = "message_param_type")]
     #[serde(rename = "type")]
-    param_type: NCReqDataMessageParameterType,
-    id: String,
-    name: String,
+    pub param_type: NCReqDataMessageParameterType,
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

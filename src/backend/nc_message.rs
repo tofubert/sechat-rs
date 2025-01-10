@@ -40,9 +40,14 @@ impl NCMessage {
     }
 
     /// return the message itself
-    pub fn get_message(&self) -> &str {
-        if !self.0.messageParameters.is_empty() {}
-        &self.0.message
+    pub fn get_message(&self) -> String {
+        let mut output = self.0.message.clone();
+        if !self.0.messageParameters.is_empty() {
+            for (key, value) in self.0.messageParameters.clone() {
+                output = output.replace(&key, &value.name);
+            }
+        }
+        output
     }
 
     /// get list of reactions as comma separated string
