@@ -86,7 +86,7 @@
 //! [Codecov]: https://app.codecov.io/gh/tofubert/sechat-rs
 //! [Deps.rs Badge]: https://deps.rs/repo/github/tofubert/sechat-rs/status.svg?style=flat-square
 //! [Deps.rs]: https://deps.rs/repo/github/tofubert/sechat-rs
-//! [Docs Badge]: https://img.shields.io/docsrs/sechat-rs?logo=rust&style=flat-square&logoColor=E05D44
+//! [Docs Badge]: https://img.shields.io/docsrs/ratatui?logo=rust&style=flat-square&logoColor=E05D44
 
 mod backend;
 /// Config and Theme Module
