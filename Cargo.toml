@@ -3,14 +3,14 @@ name = "sechat-rs"
 description = "A TUI based chat client for Nextcloud Talk"
 readme = "README.md"
 license-file = "LICENSE"
-version = "0.1.0"
+version = "0.1.0-beta"
 edition = "2018"
 categories = ["command-line-utilities"]
 keywords = ["tui", "nextcloud", "nextcloud-talk"]
 authors = ["tofu <sechat@tofuli.de>"]
-documentation = "https://docs.rs/sechat-rs/latest/sechat-rs/"
+documentation = "https://github.com/tofubert/sechat-rs"
 repository = "https://github.com/tofubert/sechat-rs"
-homepage = "https://crates.io/crates/sechat-rs"
+homepage = "https://github.com/tofubert/sechat-rs"
 exclude = [
   "assets/*",
   ".github",
@@ -20,7 +20,7 @@ exclude = [
   "tags",
 ]
 [[bin]]
-name = "sechat-rs"
+name = "sechat"
 path = "src/main.rs"
 
 
@@ -45,8 +45,8 @@ crossterm = "*"
 tui-tree-widget = "0.23"
 futures = "0.3.31"
 chrono = "0.4.39"
-num-traits = "0.2.19"
-num-derive = "0.4.2"
+num-traits = "*"
+num-derive = "*"
 log = "0.4.22"
 notify-rust = "4.11"
 itertools = "0.14.0"
