@@ -14,7 +14,7 @@
 
 ## Setup
 
-* run "cargo r" or "sechat" and enjoy
+* run "cargo r" or "sechat-rs" and enjoy
 * If no config is found a default config will be created, which you can fill in.
 * a "-c" Option for console exists, if none is proveded it will default to XDG default paths.
 * Logs will be written to "dev.log". This is so we dont write log output into the terminal UI.
