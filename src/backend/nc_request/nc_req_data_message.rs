@@ -4,10 +4,11 @@ use strum::Display;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessageParameter {
+    #[serde(deserialize_with = "message_param_type")]
     #[serde(rename = "type")]
-    param_type: String,
-    id: String,
-    name: String,
+    pub param_type: NCReqDataMessageParameterType,
+    pub id: String,
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -20,7 +21,8 @@ pub struct NCReqDataMessage {
     pub timestamp: i64,
     #[serde(deserialize_with = "sys_Message")]
     pub systemMessage: NCReqDataMessageSystemMessage,
-    pub messageType: String,
+    #[serde(deserialize_with = "message_type")]
+    pub messageType: NCReqDataMessageType,
     pub isReplyable: bool,
     pub referenceId: String,
     pub message: String,
@@ -45,7 +47,8 @@ pub struct NCReqDataMessageParent {
     pub timestamp: i32,
     #[serde(deserialize_with = "sys_Message")]
     pub systemMessage: NCReqDataMessageSystemMessage,
-    pub messageType: String,
+    #[serde(deserialize_with = "message_type")]
+    pub messageType: NCReqDataMessageType,
     pub isReplyable: bool,
     pub referenceId: String,
     pub message: String,
@@ -120,6 +123,8 @@ pub enum NCReqDataMessageSystemMessage {
     UserRemoved,
     #[serde(rename = "user_added")]
     UserAdded,
+    #[serde(rename = "listable_users")]
+    ListableUsers,
     #[serde(rename = "avatar_set")]
     AvatarSet,
     #[serde(rename = "conversation_renamed")]
@@ -132,6 +137,10 @@ pub enum NCReqDataMessageSystemMessage {
     ListableNone,
     #[serde(rename = "group_added")]
     GroupAdded,
+    #[serde(rename = "group_removed")]
+    GroupRemoved,
+    #[serde(rename = "description_set")]
+    DescriptionSet,
     #[serde(rename = "moderator_promoted")]
     ModeratorPromoted,
     #[serde(rename = "matterbridge_config_enabled")]
@@ -161,6 +170,84 @@ where
             NCReqDataMessageSystemMessageMap::String(s) => {
                 log::warn!("unknown System Message {}", s);
                 NCReqDataMessageSystemMessage::Nomessage
+            }
+        },
+    )
+}
+
+/// Message Type defined in [NCTalk API](<https://nextcloud-talk.readthedocs.io/en/stable/chat/#receive-chat-messages-of-a-conversation>)
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Display)]
+pub enum NCReqDataMessageType {
+    #[default]
+    #[serde(rename = "")]
+    Unknown,
+    #[serde(rename = "comment")]
+    Comment,
+    #[serde(rename = "comment_deleted")]
+    CommentDeleted,
+    #[serde(rename = "system")]
+    System,
+    #[serde(rename = "command")]
+    Command,
+}
+
+fn message_type<'de, D>(deserializer: D) -> Result<NCReqDataMessageType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NCReqDataMessageTypeMap {
+        ParamMap(NCReqDataMessageType),
+        String(String),
+    }
+
+    Ok(match NCReqDataMessageTypeMap::deserialize(deserializer)? {
+        NCReqDataMessageTypeMap::ParamMap(v) => v, // Ignoring parsing errors
+        NCReqDataMessageTypeMap::String(s) => {
+            log::warn!("unknown Message type {}", s);
+            NCReqDataMessageType::Unknown
+        }
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub enum NCReqDataMessageParameterType {
+    #[default]
+    Unknown,
+    #[serde(rename = "user")]
+    User,
+    #[serde(rename = "file")]
+    File,
+    #[serde(rename = "group")]
+    Group,
+    #[serde(rename = "call")]
+    Call,
+    #[serde(rename = "guest")]
+    Guest,
+    #[serde(rename = "talk-poll")]
+    TalkPoll,
+    #[serde(rename = "highlight")]
+    Highlight,
+}
+
+fn message_param_type<'de, D>(deserializer: D) -> Result<NCReqDataMessageParameterType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NCReqDataMessageParamTypeMap {
+        ParamMap(NCReqDataMessageParameterType),
+        String(String),
+    }
+
+    Ok(
+        match NCReqDataMessageParamTypeMap::deserialize(deserializer)? {
+            NCReqDataMessageParamTypeMap::ParamMap(v) => v, // Ignoring parsing errors
+            NCReqDataMessageParamTypeMap::String(s) => {
+                log::warn!("unknown Message Param type {}", s);
+                NCReqDataMessageParameterType::Unknown
             }
         },
     )
