@@ -1,5 +1,5 @@
 use crate::backend::nc_message::NCMessage;
-use crate::backend::nc_request::Token;
+use crate::backend::nc_request::{NCReqDataMessageParameterType, Token};
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
 use chrono::{DateTime, Local, Utc};
@@ -9,6 +9,7 @@ use ratatui::{
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
 };
 use textwrap::Options;
+use unicode_width::UnicodeWidthStr;
 
 // this fits my name, so 20 it is :D
 const NAME_WIDTH: u16 = 20;
@@ -209,19 +210,59 @@ impl ChatBox<'_> {
         let mut message_text = message_data.get_message().to_string();
         if let Some(params) = message_data.get_message_params() {
             for (key, value) in params {
-                message_text = message_text.replace(key, &value.name);
+                let format_key = format!("{{{key}}}");
+                match value.param_type {
+                    NCReqDataMessageParameterType::User => {
+                        message_text = message_text.replace(
+                            &format_key,
+                            format!("\u{1F464}{}\u{1F464}", &value.name).as_str(),
+                        );
+                    }
+                    NCReqDataMessageParameterType::Call => {
+                        message_text = message_text
+                            .replace(&format_key, format!("@\u{1F4DE}{}@", &value.name).as_str());
+                    }
+                    NCReqDataMessageParameterType::Group => {
+                        message_text = message_text
+                            .replace(&format_key, format!("@\u{1F465}{}@", &value.name).as_str());
+                    }
+                    NCReqDataMessageParameterType::Guest => {
+                        message_text = message_text
+                            .replace(&format_key, format!("@\u{1F47B}{}@", &value.name).as_str());
+                    }
+                    NCReqDataMessageParameterType::File => {
+                        message_text = message_text
+                            .replace(&format_key, format!("@\u{1F4C1}{}@", &value.name).as_str());
+                    }
+                    NCReqDataMessageParameterType::TalkPoll => {
+                        message_text = message_text
+                            .replace(&format_key, format!("@\u{1F5F5}{}@", &value.name).as_str());
+                    }
+                    NCReqDataMessageParameterType::Unknown => {
+                        message_text = message_text
+                            .replace(&format_key, "!!!\u{26E4}UNKNOWN PARAM REFERENCE!!!");
+                    }
+                    _ => (),
+                }
             }
         }
-        message_text
+
+        let message_lines = message_text
             .split('\n')
             .flat_map(|cell| {
-                textwrap::wrap(cell, self.width as usize)
+                textwrap::wrap(cell, Options::new(self.width as usize).break_words(false))
                     .into_iter()
                     .map(std::borrow::Cow::into_owned)
-                    .map(Line::from)
+                    .map(String::from)
                     .collect_vec()
             })
-            .collect_vec()
+            .collect_vec();
+        let lines = vec![];
+        // let mut in
+        // for line in message_lines {
+        //     line.split("\u{1F464}")
+        // }
+        // lines
     }
 }
 
