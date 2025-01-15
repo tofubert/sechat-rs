@@ -123,6 +123,8 @@ pub enum NCReqDataMessageSystemMessage {
     UserRemoved,
     #[serde(rename = "user_added")]
     UserAdded,
+    #[serde(rename = "listable_users")]
+    ListableUsers,
     #[serde(rename = "avatar_set")]
     AvatarSet,
     #[serde(rename = "conversation_renamed")]
@@ -135,6 +137,10 @@ pub enum NCReqDataMessageSystemMessage {
     ListableNone,
     #[serde(rename = "group_added")]
     GroupAdded,
+    #[serde(rename = "group_removed")]
+    GroupRemoved,
+    #[serde(rename = "description_set")]
+    DescriptionSet,
     #[serde(rename = "moderator_promoted")]
     ModeratorPromoted,
     #[serde(rename = "matterbridge_config_enabled")]
@@ -219,6 +225,10 @@ pub enum NCReqDataMessageParameterType {
     Call,
     #[serde(rename = "guest")]
     Guest,
+    #[serde(rename = "talk-poll")]
+    TalkPoll,
+    #[serde(rename = "highlight")]
+    Highlight,
 }
 
 fn message_param_type<'de, D>(deserializer: D) -> Result<NCReqDataMessageParameterType, D::Error>
