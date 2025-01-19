@@ -39,6 +39,7 @@ use tui_textarea::Input;
 use ratatui::crossterm::event::{poll, read};
 use tui_textarea::Key;
 
+use super::user_styles::UserStyles;
 use super::{notifications::NotifyWrapper, widget::logger::LogBox};
 
 enum ProcessEventResult {
@@ -76,12 +77,14 @@ pub struct App<'a, Backend: NCBackend> {
     popup_border_style: Style,
     current_room_token: Token,
     notify: NotifyWrapper,
+    user_styles: UserStyles,
 }
 
 impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend, config: &Config) -> Self {
         let init_room = backend.get_room_by_displayname(config.data.ui.default_room.as_str());
         let notify = NotifyWrapper::new(config);
+        let mut user_styles = UserStyles::new(&config.get_server_data_dir());
 
         Self {
             current_screen: CurrentScreen::Reading,
@@ -91,7 +94,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             input: InputBox::new("", config),
             chat: {
                 let mut chat = ChatBox::new(config);
-                chat.update_messages(&backend, &init_room);
+                chat.update_messages(&backend, &init_room, &mut user_styles);
                 chat.select_last_message();
                 chat
             },
@@ -108,6 +111,13 @@ impl<Backend: NCBackend> App<'_, Backend> {
             popup_border_style: config.theme.popup_border_style(),
             current_room_token: init_room,
             notify,
+            user_styles,
+        }
+    }
+
+    pub fn update_user_styles(&mut self) {
+        for user in self.backend.get_room(&self.current_room_token).get_users() {
+            self.user_styles.update(&user.actorId);
         }
     }
 
@@ -159,6 +169,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     chat_layout[0].width,
                     &self.backend,
                     &self.current_room_token,
+                    &mut self.user_styles,
                 );
                 self.chat.render_area(f, chat_layout[0]);
                 self.users.render_area(f, chat_layout[1]);
@@ -167,6 +178,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     main_layout[0].width,
                     &self.backend,
                     &self.current_room_token,
+                    &mut self.user_styles,
                 );
                 self.chat.render_area(f, main_layout[0]);
             }
@@ -225,8 +237,11 @@ impl<Backend: NCBackend> App<'_, Backend> {
         self.title
             .update(self.current_screen, &self.backend, &self.current_room_token);
         self.selector.update(&self.backend)?;
-        self.chat
-            .update_messages(&self.backend, &self.current_room_token);
+        self.chat.update_messages(
+            &self.backend,
+            &self.current_room_token,
+            &mut self.user_styles,
+        );
         self.users.update(&self.backend, &self.current_room_token);
         Ok(())
     }
@@ -318,7 +333,8 @@ impl<Backend: NCBackend> App<'_, Backend> {
     }
 
     pub fn write_log_files(&mut self) -> Result<(), std::io::Error> {
-        self.backend.write_to_log()
+        self.backend.write_to_log()?;
+        self.user_styles.write_to_log()
     }
 
     async fn run_app<B: ratatui::prelude::Backend>(
@@ -326,6 +342,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
         mut terminal: Terminal<B>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.select_room().await?;
+        self.update_user_styles();
         log::info!("Entering Main Loop");
         let mut write_back_timer = Instant::now();
         loop {
