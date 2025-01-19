@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct NCReqDataParticipants {
     attendeeId: i32,
     actorType: String,
-    actorId: String,
+    pub actorId: String,
     pub displayName: String,
     participantType: i32,
     lastPing: i32,

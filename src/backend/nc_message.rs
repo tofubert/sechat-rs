@@ -106,4 +106,9 @@ impl NCMessage {
     pub fn has_reactions(&self) -> bool {
         !self.0.reactions.is_empty()
     }
+
+    /// return actorId
+    pub fn get_actor_id(&self) -> String {
+        self.0.actorId.clone()
+    }
 }

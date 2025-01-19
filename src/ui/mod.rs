@@ -2,4 +2,5 @@
 pub mod app;
 pub mod notifications;
 mod terminal_helpers;
+pub mod user_styles;
 mod widget;

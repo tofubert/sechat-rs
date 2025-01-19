@@ -1,6 +1,7 @@
 use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
+use crate::ui::user_styles::UserStyles;
 use chrono::{DateTime, Local, Utc};
 use ratatui::{
     prelude::*,
@@ -48,15 +49,21 @@ impl ChatBox<'_> {
         width: u16,
         backend: &impl NCBackend,
         current_room: &Token,
+        user_styles: &UserStyles,
     ) {
         let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
-            self.update_messages(backend, current_room);
+            self.update_messages(backend, current_room, user_styles);
         }
     }
 
-    pub fn update_messages(&mut self, backend: &impl NCBackend, current_room: &Token) {
+    pub fn update_messages(
+        &mut self,
+        backend: &impl NCBackend,
+        current_room: &Token,
+        user_styles: &UserStyles,
+    ) {
         use itertools::Itertools;
         use std::convert::TryInto;
 
@@ -90,6 +97,17 @@ impl ChatBox<'_> {
                 last_date = date_str;
             }
 
+            let name_style;
+            if let Some(user_style) = user_styles
+                .user_styles
+                .iter()
+                .find(|us| us.0.eq(&message_data.get_actor_id()))
+            {
+                name_style = *user_style.1;
+            } else {
+                log::debug!("User \"{}\" has no style!", message_data.get_name());
+                name_style = Style::default().fg(Color::Red);
+            }
             let name = textwrap::wrap(
                 message_data.get_name().to_string().as_str(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
@@ -97,6 +115,7 @@ impl ChatBox<'_> {
             .into_iter()
             .map(std::borrow::Cow::into_owned)
             .map(Line::from)
+            .map(|l| l.style(name_style))
             .collect_vec();
 
             let message_string = message_data
@@ -214,7 +233,7 @@ impl StatefulWidget for &ChatBox<'_> {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use crate::backend::nc_message::NCMessage;
     use crate::backend::nc_request::{NCReqDataMessage, NCReqDataParticipants};
@@ -237,21 +256,25 @@ mod tests {
         let mut mock_nc_backend = MockNCTalk::new();
         let mut mock_room = MockNCRoomInterface::new();
         let timestamp_1 = DateTime::<Utc>::from_timestamp(2000, 0).unwrap();
+        let actor_id_1 = "abcd1234".to_string();
         let mock_message_1 = NCMessage::from(NCReqDataMessage {
             id: 0,
             message: "Butz".to_string(),
             messageType: "comment".to_string(),
             actorDisplayName: "Hundi".to_string(),
             timestamp: timestamp_1.timestamp(),
+            actorId: actor_id_1.clone(),
             ..Default::default()
         });
         let timestamp_2 = DateTime::<Utc>::from_timestamp(200_000, 0).unwrap();
+        let actor_id_2 = "1234abcd".to_string();
         let mock_message_2 = NCMessage::from(NCReqDataMessage {
             id: 1,
             message: "Bert".to_string(),
             messageType: "comment".to_string(),
             actorDisplayName: "Stinko".to_string(),
             timestamp: timestamp_2.timestamp(),
+            actorId: actor_id_2.clone(),
             ..Default::default()
         });
         let message_tree = BTreeMap::from([(1, mock_message_1), (2, mock_message_2)]);
@@ -294,7 +317,16 @@ mod tests {
 
         terminal.backend().assert_buffer(&expected);
 
-        chat_box.update_messages(&mock_nc_backend, &"123".to_string());
+        let user_style_1 = Style::default().fg(Color::Red);
+        let user_style_2 = Style::default().fg(Color::Green);
+        let user_styles = UserStyles {
+            user_styles: HashMap::from([
+                (actor_id_1.clone(), user_style_1),
+                (actor_id_2.clone(), user_style_2),
+            ]),
+            ..Default::default()
+        };
+        chat_box.update_messages(&mock_nc_backend, &"123".to_string(), &user_styles);
 
         terminal
             .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
@@ -318,6 +350,7 @@ mod tests {
             Rect::new(0, 1, 40, 1),
             config.theme.default_highlight_style(),
         );
+        expected.set_style(Rect::new(6, 2, 20, 1), user_style_1);
         expected.set_style(
             Rect::new(27, 1, 13, 1),
             config
@@ -325,6 +358,7 @@ mod tests {
                 .default_highlight_style()
                 .add_modifier(Modifier::BOLD),
         );
+        expected.set_style(Rect::new(6, 4, 20, 1), user_style_2);
         expected.set_style(
             Rect::new(27, 3, 13, 1),
             config
