@@ -213,6 +213,14 @@ impl<Backend: NCBackend> App<'_, Backend> {
         Ok(())
     }
 
+    pub async fn mark_all_as_read(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.backend.mark_all_rooms_as_read().await?;
+        self.notify
+            .maybe_notify_new_rooms(self.backend.update_rooms(true).await?)?;
+        self.update_ui()?;
+        Ok(())
+    }
+
     fn update_ui(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.title
             .update(self.current_screen, &self.backend, &self.current_room_token);
@@ -497,6 +505,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             }
             KeyCode::Char('k') | KeyCode::Up if key.kind == KeyEventKind::Press => self.scroll_up(),
             KeyCode::Char('m') => self.mark_current_as_read().await?,
+            KeyCode::Char('M') => self.mark_all_as_read().await?,
             KeyCode::Char('o') => self.switch_screen(CurrentScreen::Opening),
             KeyCode::Char('L') => self.switch_screen(CurrentScreen::Logging),
             KeyCode::Char('q') => self.popup = Some(Popup::Exit),

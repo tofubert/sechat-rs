@@ -74,6 +74,9 @@ pub trait NCBackend: Debug + Send {
         &self,
         token: &Token,
     ) -> Result<(), Box<dyn std::error::Error>>;
+    /// Mark the room identified by the Token as read.
+    /// Does not need to be the current Room, but usually is.
+    async fn mark_all_rooms_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
     /// Fetch a rooms full history.
     async fn fetch_room_history(&mut self, token: &Token) -> Result<(), Box<dyn Error>>;
     /// trigger for all threads to be killed.
@@ -490,6 +493,15 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             .mark_as_read(Arc::clone(&self.requester))
             .await
     }
+    async fn mark_all_rooms_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
+        for token in self.get_unread_rooms() {
+            self.rooms[&token]
+                .mark_as_read(Arc::clone(&self.requester))
+                .await?;
+        }
+        Ok(())
+    }
+
     fn get_room(&self, token: &Token) -> &Self::Room {
         &self.rooms[token]
     }
@@ -531,6 +543,7 @@ mock! {
         async fn select_room(&mut self, token: &Token) -> Result<Option<(String, usize)>, Box<dyn Error>>;
         async fn update_rooms(& mut self, force_update: bool) -> Result<Vec<String>, Box<dyn Error>>;
         async fn mark_current_room_as_read(&self, token: &Token) -> Result<(), Box<dyn std::error::Error>>;
+        async fn mark_all_rooms_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
         async fn fetch_room_history(&mut self, token: &Token) -> Result<(), Box<dyn Error>>;
         async fn shutdown(&self) -> Result<(), Box<dyn std::error::Error>>;
     }
