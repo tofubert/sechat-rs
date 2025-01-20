@@ -495,9 +495,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
     }
     async fn mark_all_rooms_as_read(&self) -> Result<(), Box<dyn std::error::Error>> {
         for token in self.get_unread_rooms() {
-            self.rooms[&token]
-                .mark_as_read(Arc::clone(&self.requester))
-                .await?;
+            self.mark_current_room_as_read(&token).await?;
         }
         Ok(())
     }
