@@ -74,8 +74,7 @@ pub trait NCBackend: Debug + Send {
         &self,
         token: &Token,
     ) -> Result<(), Box<dyn std::error::Error>>;
-    /// Mark the room identified by the Token as read.
-    /// Does not need to be the current Room, but usually is.
+    /// Mark all rooms as read, goes over list of unread rooms.
     async fn mark_all_rooms_as_read(&self) -> Result<(), Box<dyn std::error::Error>>;
     /// Fetch a rooms full history.
     async fn fetch_room_history(&mut self, token: &Token) -> Result<(), Box<dyn Error>>;
