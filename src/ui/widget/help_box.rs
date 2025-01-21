@@ -42,6 +42,11 @@ impl Widget for &HelpBox {
                         "mark current chat as read, when in reading mode.",
                     ]),
                     Row::new([
+                      "M",
+                      "mark all as read",
+                      "mark all chats as read, when in reading mode.",
+                  ]),
+                    Row::new([
                         "(e|i)",
                         "edit",
                         "enter the editing screen, when in reading mode.",
@@ -117,10 +122,10 @@ mod tests {
             "│  f     fetch history        Force a full   │",
             "│  ?     help                 enter this he  │",
             "│  m     mark as read         mark current   │",
+            "│  M     mark all as read     mark all chat  │",
             "│  (e|i) edit                 enter the edi  │",
             "│  (u|d) jump scroll          scroll up or   │",
             "│  ESC   leave Mode           leave help, o  │",
-            "│  Enter send/select          Send Message,  │",
             "│                                            │",
             "└────────────────────────────────────────────┘",
         ]);

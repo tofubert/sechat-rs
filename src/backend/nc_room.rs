@@ -470,8 +470,11 @@ impl NCRoomInterface for NCRoom {
         requester: Arc<Mutex<Requester>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         use std::cmp::Ordering;
-
-        if let Some(last_internal_id) = self.get_last_room_level_message_id() {
+        if let Some(room) = data_option {
+            if room.unreadMessages != self.room_data.unreadMessages {
+                self.update(Some(room), requester).await?;
+            }
+        } else if let Some(last_internal_id) = self.get_last_room_level_message_id() {
             match message_id.cmp(&last_internal_id) {
                 Ordering::Greater => {
                     log::info!(
@@ -503,6 +506,7 @@ impl NCRoomInterface for NCRoom {
                 Ordering::Equal => (),
             }
         }
+
         Ok(())
     }
 
