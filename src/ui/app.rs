@@ -84,7 +84,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend, config: &Config) -> Self {
         let init_room = backend.get_room_by_displayname(config.data.ui.default_room.as_str());
         let notify = NotifyWrapper::new(config);
-        let user_styles = UserStyles::new(&config.get_server_data_dir());
+        let mut user_styles = UserStyles::new(&config.get_server_data_dir());
 
         Self {
             current_screen: CurrentScreen::Reading,
@@ -94,7 +94,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             input: InputBox::new("", config),
             chat: {
                 let mut chat = ChatBox::new(config);
-                chat.update_messages(&backend, &init_room, &user_styles);
+                chat.update_messages(&backend, &init_room, &mut user_styles);
                 chat.select_last_message();
                 chat
             },
@@ -169,7 +169,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     chat_layout[0].width,
                     &self.backend,
                     &self.current_room_token,
-                    &self.user_styles,
+                    &mut self.user_styles,
                 );
                 self.chat.render_area(f, chat_layout[0]);
                 self.users.render_area(f, chat_layout[1]);
@@ -178,7 +178,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     main_layout[0].width,
                     &self.backend,
                     &self.current_room_token,
-                    &self.user_styles,
+                    &mut self.user_styles,
                 );
                 self.chat.render_area(f, main_layout[0]);
             };
@@ -237,9 +237,11 @@ impl<Backend: NCBackend> App<'_, Backend> {
         self.title
             .update(self.current_screen, &self.backend, &self.current_room_token);
         self.selector.update(&self.backend)?;
-        self.update_user_styles();
-        self.chat
-            .update_messages(&self.backend, &self.current_room_token, &self.user_styles);
+        self.chat.update_messages(
+            &self.backend,
+            &self.current_room_token,
+            &mut self.user_styles,
+        );
         self.users.update(&self.backend, &self.current_room_token);
         Ok(())
     }

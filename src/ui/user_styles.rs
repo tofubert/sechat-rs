@@ -44,7 +44,7 @@ impl UserStyles {
     }
 
     pub fn update(&mut self, user_id: &str) {
-        if !self.user_style_map.iter().any(|m| m.0.eq(user_id)) {
+        if !self.user_style_map.contains_key(user_id) {
             log::trace!("added {user_id}");
             self.user_style_map.insert(
                 user_id.to_string(),

@@ -49,7 +49,7 @@ impl ChatBox<'_> {
         width: u16,
         backend: &impl NCBackend,
         current_room: &Token,
-        user_styles: &UserStyles,
+        user_styles: &mut UserStyles,
     ) {
         let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
@@ -62,7 +62,7 @@ impl ChatBox<'_> {
         &mut self,
         backend: &impl NCBackend,
         current_room: &Token,
-        user_styles: &UserStyles,
+        user_styles: &mut UserStyles,
     ) {
         use itertools::Itertools;
         use std::convert::TryInto;
@@ -97,17 +97,14 @@ impl ChatBox<'_> {
                 last_date = date_str;
             }
 
-            let name_style;
-            if let Some(user_style) = user_styles
+            if !user_styles
                 .user_style_map
-                .iter()
-                .find(|us| us.0.eq(&message_data.get_actor_id()))
+                .contains_key(&message_data.get_actor_id())
             {
-                name_style = *user_style.1;
-            } else {
-                log::debug!("User \"{}\" has no style!", message_data.get_name());
-                name_style = Style::default().fg(Color::Red);
+                user_styles.update(&message_data.get_actor_id());
             }
+            let name_style = user_styles.user_style_map[&message_data.get_actor_id()];
+
             let name = textwrap::wrap(
                 message_data.get_name().to_string().as_str(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
@@ -319,14 +316,14 @@ mod tests {
 
         let user_style_1 = Style::default().fg(Color::Red);
         let user_style_2 = Style::default().fg(Color::Green);
-        let user_styles = UserStyles {
+        let mut user_styles = UserStyles {
             user_style_map: HashMap::from([
                 (actor_id_1.clone(), user_style_1),
                 (actor_id_2.clone(), user_style_2),
             ]),
             ..Default::default()
         };
-        chat_box.update_messages(&mock_nc_backend, &"123".to_string(), &user_styles);
+        chat_box.update_messages(&mock_nc_backend, &"123".to_string(), &mut user_styles);
 
         terminal
             .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
