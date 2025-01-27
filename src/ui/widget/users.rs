@@ -33,6 +33,9 @@ impl Users<'_> {
             table_header_style: config.theme.table_header_style(),
         }
     }
+    pub fn get_user_list(&self) -> &Vec<Row<'_>> {
+        &self.user_list
+    }
     pub fn render_area(&self, frame: &mut Frame, area: Rect) {
         frame.render_stateful_widget(self, area, &mut self.state.clone());
     }
