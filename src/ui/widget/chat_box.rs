@@ -99,7 +99,7 @@ impl ChatBox<'_> {
 
             let name_style;
             if let Some(user_style) = user_styles
-                .user_styles
+                .user_style_map
                 .iter()
                 .find(|us| us.0.eq(&message_data.get_actor_id()))
             {
@@ -320,7 +320,7 @@ mod tests {
         let user_style_1 = Style::default().fg(Color::Red);
         let user_style_2 = Style::default().fg(Color::Green);
         let user_styles = UserStyles {
-            user_styles: HashMap::from([
+            user_style_map: HashMap::from([
                 (actor_id_1.clone(), user_style_1),
                 (actor_id_2.clone(), user_style_2),
             ]),

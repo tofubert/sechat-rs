@@ -84,7 +84,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
     pub fn new(backend: Backend, config: &Config) -> Self {
         let init_room = backend.get_room_by_displayname(config.data.ui.default_room.as_str());
         let notify = NotifyWrapper::new(config);
-        let user_styles = UserStyles::new();
+        let user_styles = UserStyles::new(&config.get_server_data_dir());
 
         Self {
             current_screen: CurrentScreen::Reading,
@@ -326,7 +326,8 @@ impl<Backend: NCBackend> App<'_, Backend> {
     }
 
     pub fn write_log_files(&mut self) -> Result<(), std::io::Error> {
-        self.backend.write_to_log()
+        self.backend.write_to_log()?;
+        self.user_styles.write_to_log()
     }
 
     async fn run_app<B: ratatui::prelude::Backend>(
