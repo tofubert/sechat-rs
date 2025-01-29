@@ -563,7 +563,8 @@ mod tests {
     use super::*;
     use crate::{
         backend::nc_request::{
-            nc_requester::MockNCRequest, NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom,
+            nc_requester::MockNCRequest, NCReqDataMessage, NCReqDataMessageType,
+            NCReqDataParticipants, NCReqDataRoom,
         },
         config::init,
     };
@@ -582,7 +583,7 @@ mod tests {
 
     fn get_default_message() -> NCReqDataMessage {
         NCReqDataMessage {
-            messageType: "comment".to_string(),
+            messageType: NCReqDataMessageType::Comment,
             id: 1,
             ..Default::default()
         }
@@ -602,7 +603,7 @@ mod tests {
             .expect("Sending Failed.");
 
         let update_message = NCReqDataMessage {
-            messageType: "comment".to_string(),
+            messageType: NCReqDataMessageType::Comment,
             id: 2,
             ..Default::default()
         };
@@ -726,7 +727,7 @@ mod tests {
         let (chat_update_tx, chat_update_rx) = tokio::sync::oneshot::channel();
 
         let post_send_message = NCReqDataMessage {
-            messageType: "comment".to_string(),
+            messageType: NCReqDataMessageType::Comment,
             id: 3,
             ..Default::default()
         };

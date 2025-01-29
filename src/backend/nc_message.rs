@@ -1,4 +1,9 @@
-use super::nc_request::{NCReqDataMessage, NCReqDataMessageSystemMessage};
+use std::collections::HashMap;
+
+use super::nc_request::{
+    NCReqDataMessage, NCReqDataMessageParameter, NCReqDataMessageSystemMessage,
+    NCReqDataMessageType,
+};
 use chrono::prelude::*;
 
 /// `NextCloud` message interface
@@ -45,6 +50,15 @@ impl NCMessage {
         &self.0.message
     }
 
+    /// return Message Params
+    pub fn get_message_params(&self) -> Option<&HashMap<String, NCReqDataMessageParameter>> {
+        if self.0.messageParameters.is_empty() {
+            None
+        } else {
+            Some(&self.0.messageParameters)
+        }
+    }
+
     /// get list of reactions as comma separated string
     pub fn get_reactions_str(&self) -> String {
         self.0
@@ -67,17 +81,17 @@ impl NCMessage {
 
     /// return `true` if message is a comment
     pub fn is_comment(&self) -> bool {
-        self.0.messageType == "comment"
+        self.0.messageType == NCReqDataMessageType::Comment
     }
 
     /// return `true` if message is a deleted comment
     pub fn is_comment_deleted(&self) -> bool {
-        self.0.messageType == "comment_deleted"
+        self.0.messageType == NCReqDataMessageType::CommentDeleted
     }
 
     /// return `true` if message is a system message
     pub fn is_system(&self) -> bool {
-        self.0.messageType == "system"
+        self.0.messageType == NCReqDataMessageType::System
     }
 
     /// return `true` if message is an edited message
@@ -99,7 +113,7 @@ impl NCMessage {
 
     /// return `true` if message is a command
     pub fn is_command(&self) -> bool {
-        self.0.messageType == "command"
+        self.0.messageType == NCReqDataMessageType::Command
     }
 
     /// return `true` if message has any reactions

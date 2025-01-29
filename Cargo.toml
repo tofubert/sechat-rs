@@ -67,6 +67,7 @@ async-trait = "0.1.83"
 serde_with = "3.11.0"
 tokio-util = "0.7.13"
 tui-logger = { version = "0.14.1", features = ["crossterm" ] }
+unicode-width = "0.2.0"
 
 
 [workspace.lints.rust]
