@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use std::{path::Path, path::PathBuf};
 use theme::{options::ColorPalette, Theme};
 use toml_example::TomlExample;
+use tui_logger::TuiLoggerFile;
 
 #[derive(Debug)]
 pub struct Config {
@@ -166,8 +167,8 @@ impl Config {
 
         if self.data.general.log_to_file {
             let log_path = self.strategy.data_dir().join("app.log");
-
-            tui_logger::set_log_file(log_path.to_str().unwrap()).unwrap();
+            let logger_struct = TuiLoggerFile::new(log_path.to_str().unwrap()).output_line(true);
+            tui_logger::set_log_file(logger_struct);
         }
     }
 }
