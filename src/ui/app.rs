@@ -169,7 +169,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                     &self.current_room_token,
                 );
                 self.chat.render_area(f, main_layout[0]);
-            };
+            }
 
             self.input.render_area(f, main_layout[1]);
         }
@@ -348,7 +348,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
         // `Ok(true)`.
         match event {
             Event::Key(key) => {
-                log::trace!("Processing key event {:?}", key);
+                log::trace!("Processing key event {key:?}");
                 if let Some(popup) = self.popup {
                     match popup {
                         Popup::Help => self.handle_key_in_help(key),
@@ -378,7 +378,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 _ => (),
             },
             _ => {
-                log::warn!("Unknown Event {:?}", event);
+                log::warn!("Unknown Event {event:?}");
             }
         }
         Ok(ProcessEventResult::Continue)
@@ -421,7 +421,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 KeyCode::Home => _ = self.selector.state.select_first(),
                 KeyCode::End => _ = self.selector.state.select_last(),
                 _ => (),
-            };
+            }
         }
         Ok(())
     }
@@ -443,7 +443,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 self.send_message().await?;
             }
             _ => self.new_input_key(key),
-        };
+        }
 
         Ok(())
     }
@@ -478,10 +478,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('?') => self.popup = Some(Popup::Help),
             KeyCode::Char('y') => {
                 if let Err(err) = self.write_log_files() {
-                    log::warn!(
-                        "Failure to store logs into log file ({}), ignoring for now.",
-                        err
-                    );
+                    log::warn!("Failure to store logs into log file ({err}), ignoring for now.",);
                 }
                 return Some(Ok(ProcessEventResult::Exit));
             }
@@ -513,7 +510,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('u') => self.toggle_user_sidebar(),
             KeyCode::Char('f') => self.fetch_current_room_history().await?,
             _ => (),
-        };
+        }
         Ok(())
     }
 

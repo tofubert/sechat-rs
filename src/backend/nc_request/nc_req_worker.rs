@@ -139,7 +139,7 @@ impl NCRequestWorker {
             reqwest::StatusCode::NOT_MODIFIED => Ok(Some(Vec::new())),
             reqwest::StatusCode::PRECONDITION_FAILED => Ok(None),
             _ => {
-                log::debug!("{} got Err {:?}", token, response);
+                log::debug!("{token} got Err {response:?}");
                 Err(Box::new(
                     response
                         .error_for_status()
@@ -210,7 +210,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
             .default_headers(headers.clone())
             .build()?;
 
-        log::trace!("Worker Ready {}", base_url.to_string());
+        log::trace!("Worker Ready {base_url}");
 
         Ok(NCRequestWorker {
             base_url: base_url.to_string(),
@@ -261,7 +261,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
                     Ok(parser_response) => Ok(parser_response.ocs.data),
                     Err(why) => {
                         self.dump_json_to_log(&url_string, &text)?;
-                        log::debug!("{} with {:?}", url_string, why);
+                        log::debug!("{url_string} with {why:?}");
                         Err(Box::new(why))
                     }
                 }
@@ -294,7 +294,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
                     Ok(parser_response) => Ok(parser_response.ocs.data),
                     Err(why) => {
                         self.dump_json_to_log(&url_string, &text)?;
-                        log::debug!("{} with {:?}", url_string, why);
+                        log::debug!("{url_string} with {why:?}");
                         Err(Box::new(why))
                     }
                 }
