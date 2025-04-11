@@ -25,6 +25,7 @@ use crate::{
     },
 };
 use ratatui::{
+    crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind},
     layout::{Alignment, Constraint, Direction, Flex, Layout, Position},
     style::{Style, Stylize},
     widgets::{Block, Clear, Paragraph},
@@ -34,9 +35,7 @@ use strum_macros::Display;
 
 use tui_textarea::Input;
 
-use crossterm::event::{
-    poll, read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind,
-};
+use ratatui::crossterm::event::{poll, read};
 use tui_textarea::Key;
 
 use super::{notifications::NotifyWrapper, widget::logger::LogBox};
