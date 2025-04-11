@@ -103,7 +103,7 @@ pub struct NCRequest {
 
 impl NCRequest {
     async fn handle_req(worker: &NCRequestWorker, req: ApiRequests) {
-        log::trace!("got a new API Request {}", req);
+        log::trace!("got a new API Request {req}");
         match req {
             ApiRequests::FetchChatInitial(token, maxMessage, response) => {
                 response
@@ -183,7 +183,7 @@ impl NCRequest {
             while !cloned_cancel_token.is_cancelled() {
                 let mut buffer: Vec<ApiRequests> = vec![];
                 let added = rx.recv_many(&mut buffer, 5).await;
-                log::trace!("got {} requests to API", added);
+                log::trace!("got {added} requests to API");
 
                 // the revc_many function might be in flight while we get cancelt.
                 if cloned_cancel_token.is_cancelled() {

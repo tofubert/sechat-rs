@@ -116,7 +116,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Send> NCTalk<Request
             if let Some(room) = room_option {
                 rooms.insert(name, room);
             } else {
-                log::warn!("Encountered a room that cannot be added {} ", name);
+                log::warn!("Encountered a room that cannot be added {name}");
             }
         }
     }
@@ -329,7 +329,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             );
             Err(why)
         } else {
-            log::debug!("Wrote Logs to files! {:?} ", tmp_path_buf);
+            log::debug!("Wrote Logs to files! {tmp_path_buf:?} ",);
             Ok(())
         }
     }

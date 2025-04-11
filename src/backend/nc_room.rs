@@ -217,7 +217,7 @@ impl NCRoom {
                 .expect("Failed for fetch chat update")
                 .expect("Failed request");
             if response.is_empty() {
-                log::debug!("No Messages found aborting {}", fetch_key);
+                log::debug!("No Messages found aborting {fetch_key}");
                 break;
             }
             fetch_key = response.last().expect("No Messages fetched").id;
@@ -384,7 +384,7 @@ impl NCRoomInterface for NCRoom {
                             self.messages
                                 .keys()
                                 .sorted()
-                                .last()
+                                .next_back()
                                 .expect("Failed to sort messages by its keys."),
                         )
                         .ok_or("No last message")?
@@ -402,11 +402,7 @@ impl NCRoomInterface for NCRoom {
         let update_info = Some((self.room_data.displayName.clone(), response.len()));
 
         if !is_empty {
-            log::info!(
-                "Updating {} adding {} new Messages",
-                self.to_string(),
-                response.len().to_string()
-            );
+            log::info!("Updating {} adding {} new Messages", self, response.len());
         }
         for message in response {
             self.messages.insert(message.id, message.into());
@@ -447,7 +443,7 @@ impl NCRoomInterface for NCRoom {
                                 self.messages
                                     .keys()
                                     .sorted()
-                                    .last()
+                                    .next_back()
                                     .expect("Failed to sort messages by its keys."),
                             )
                             .ok_or("No last message")?
@@ -477,18 +473,14 @@ impl NCRoomInterface for NCRoom {
         } else if let Some(last_internal_id) = self.get_last_room_level_message_id() {
             match message_id.cmp(&last_internal_id) {
                 Ordering::Greater => {
-                    log::info!(
-                        "New Messages for '{}' was {} now {}",
-                        self.to_string(),
-                        last_internal_id,
-                        message_id
-                    );
+                    let name = self.to_string();
+                    log::info!("New Messages for '{name}' was {last_internal_id} now {message_id}");
                     self.update(data_option, requester).await?;
                 }
                 Ordering::Less => {
                     log::debug!(
                         "Message Id was older than message stored '{}'! Stored {} {} {} Upstream {}",
-                        self.to_string(),
+                        self,
                         last_internal_id,
                         self.messages
                             .get(&last_internal_id)
@@ -553,7 +545,7 @@ impl NCRoomInterface for NCRoom {
         let mut running_key = fetch_key + 10_000;
         let mut thread_handles = vec![];
         for key in (fetch_key..=last_entry).step_by(10_000) {
-            log::debug!("Fetching thread {} to {} ", key, running_key);
+            log::debug!("Fetching thread {key} to {running_key} ");
             let token = self.room_data.token.clone();
             let cloned_requester = requester.clone();
             thread_handles.push(tokio::spawn(async move {
