@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
-use strum::Display;
+use strum_macros::Display;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct NCReqDataMessageParameter {

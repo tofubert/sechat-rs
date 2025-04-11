@@ -1,6 +1,6 @@
 use crate::config::Config;
-use crossterm::event::{KeyCode, KeyEvent};
 use log::LevelFilter;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
 use tui_logger::{TuiLoggerLevelOutput, TuiLoggerSmartWidget, TuiWidgetEvent, TuiWidgetState};
 
