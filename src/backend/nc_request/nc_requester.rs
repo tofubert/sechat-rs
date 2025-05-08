@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use crate::config::Config;
 use async_trait::async_trait;
 
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, io::ErrorKind};
 use std::{fmt::Debug, sync::Arc};
 
 #[cfg(test)]
@@ -114,12 +114,21 @@ impl NCRequest {
                     .expect("could not Send.");
             }
             ApiRequests::FetchChatUpdate(token, maxMessage, last_message, response) => {
-                response
-                    .send(Ok(worker
-                        .fetch_chat_update(&token, maxMessage, last_message)
-                        .await
-                        .unwrap()))
-                    .expect("could not Send.");
+                let data = worker
+                    .fetch_chat_update(&token, maxMessage, last_message)
+                    .await;
+
+                if let Ok(data_content) = data {
+                    response.send(Ok(data_content)).expect("could not Send.");
+                } else {
+                    log::error!("Failed to fetch chat update {data:?}");
+                    response
+                        .send(Err(Arc::new(std::io::Error::new(
+                            ErrorKind::Other,
+                            format!("Got a Request Rejected! {data:?}"),
+                        ))))
+                        .expect("could not Send.");
+                }
             }
             ApiRequests::FetchRoomsInitial(response) => {
                 response
