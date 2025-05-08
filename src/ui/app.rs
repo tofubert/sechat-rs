@@ -33,6 +33,7 @@ use ratatui::{
 };
 use strum_macros::Display;
 
+use tokio::time::Instant;
 use tui_textarea::Input;
 
 use ratatui::crossterm::event::{poll, read};
@@ -321,6 +322,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.select_room().await?;
         log::info!("Entering Main Loop");
+        let mut write_back_timer = Instant::now();
         loop {
             terminal.draw(|f| self.ui(f))?;
 
@@ -335,6 +337,10 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 log::trace!("Looking for Updates on the server.");
                 // trigger a fetch from upstream for messages
                 self.fetch_updates().await?;
+            }
+            if write_back_timer.elapsed() > tokio::time::Duration::from_secs(300) {
+                write_back_timer = Instant::now();
+                self.write_log_files()?;
             }
         }
     }
