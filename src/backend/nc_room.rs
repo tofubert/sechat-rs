@@ -212,18 +212,18 @@ impl NCRoom {
                     .await
                     .unwrap()
             };
-            let response = response_onceshot
-                .await
-                .expect("Failed for fetch chat update")
-                .expect("Failed request");
-            if response.is_empty() {
-                log::debug!("No Messages found aborting {fetch_key}");
-                break;
-            }
-            fetch_key = response.last().expect("No Messages fetched").id;
+            if let Ok(Ok(response)) = response_onceshot.await {
+                if response.is_empty() {
+                    log::debug!("No Messages found aborting {fetch_key}");
+                    break;
+                }
+                fetch_key = response.last().expect("No Messages fetched").id;
 
-            for message in response {
-                messages.insert(message.id, message.into());
+                for message in response {
+                    messages.insert(message.id, message.into());
+                }
+            } else {
+                break;
             }
         }
         messages
