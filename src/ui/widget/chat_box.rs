@@ -312,8 +312,8 @@ mod tests {
 
         terminal.backend().assert_buffer(&expected);
 
-        let user_style_1 = Style::default().fg(Color::Red);
-        let user_style_2 = Style::default().fg(Color::Green);
+        let user_style_1 = Style::default().fg(Color::Rgb(196, 205, 151)); // Hash for Hundi
+        let user_style_2 = Style::default().fg(Color::Rgb(151, 205, 156)); // Hash for Stinko
 
         chat_box.update_messages(&mock_nc_backend, &"123".to_string());
 
