@@ -331,7 +331,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
             );
             Err(why)
         } else {
-            log::debug!("Wrote Logs to files! {tmp_path_buf:?} ",);
+            log::debug!("Wrote Logs to files! {} ", tmp_path_buf.display());
             Ok(())
         }
     }
