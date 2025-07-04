@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 use crate::config::Config;
 use async_trait::async_trait;
 
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, io::ErrorKind};
 use std::{fmt::Debug, sync::Arc};
 
 #[cfg(test)]
@@ -106,49 +106,35 @@ impl NCRequest {
         log::trace!("got a new API Request {req}");
         match req {
             ApiRequests::FetchChatInitial(token, maxMessage, response) => {
-                response
-                    .send(Ok(worker
-                        .fetch_chat_initial(&token, maxMessage)
-                        .await
-                        .unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_fetch_chat_initial(worker, token, maxMessage, response).await;
             }
             ApiRequests::FetchChatUpdate(token, maxMessage, last_message, response) => {
-                response
-                    .send(Ok(worker
-                        .fetch_chat_update(&token, maxMessage, last_message)
-                        .await
-                        .unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_fetch_chat_update(
+                    worker,
+                    token,
+                    maxMessage,
+                    last_message,
+                    response,
+                )
+                .await;
             }
             ApiRequests::FetchRoomsInitial(response) => {
-                response
-                    .send(Ok(worker.fetch_rooms_initial().await.unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_fetch_rooms_initial(worker, response).await;
             }
             ApiRequests::FetchRoomsUpdate(last_timestamp, response) => {
-                response
-                    .send(Ok(worker.fetch_rooms_update(last_timestamp).await.unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_fetch_rooms_update(worker, last_timestamp, response).await;
             }
             ApiRequests::SendMessage(token, message, response) => {
-                response
-                    .send(Ok(worker.send_message(message, &token).await.unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_send_message(worker, token, message, response).await;
             }
             ApiRequests::FetchAutocompleteUsers(name, response) => {
-                response
-                    .send(Ok(worker.fetch_autocomplete_users(&name).await.unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_autocomplete_users(worker, name, response).await;
             }
             ApiRequests::FetchParticipants(token, response) => {
-                response
-                    .send(Ok(worker.fetch_participants(&token).await.unwrap()))
-                    .expect("could not Send.");
+                NCRequest::handle_fetch_participants(worker, token, response).await;
             }
             ApiRequests::MarkChatRead(token, last_message, response) => {
-                worker.mark_chat_read(&token, last_message).await.unwrap();
-                response.send(Ok(())).expect("could not Send.");
+                NCRequest::handle_mark_read(worker, token, last_message, response).await;
             }
             ApiRequests::None => {
                 log::warn!("Unknown Request");
@@ -223,6 +209,157 @@ impl NCRequest {
         NCRequest {
             request_tx: tx,
             cancel_token,
+        }
+    }
+    async fn handle_fetch_chat_initial(
+        worker: &NCRequestWorker,
+        token: String,
+        maxMessage: i32,
+        response: ApiResponseChannel<Vec<NCReqDataMessage>>,
+    ) {
+        let req_response = worker.fetch_chat_initial(&token, maxMessage).await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to fetch initial chat {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_fetch_chat_update(
+        worker: &NCRequestWorker,
+        token: String,
+        maxMessage: i32,
+        last_message: i32,
+        response: ApiResponseChannel<Vec<NCReqDataMessage>>,
+    ) {
+        let data = worker
+            .fetch_chat_update(&token, maxMessage, last_message)
+            .await;
+
+        if let Ok(data_content) = data {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to fetch chat update {data:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {data:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_fetch_rooms_initial(
+        worker: &NCRequestWorker,
+        response: ApiResponseChannel<(Vec<NCReqDataRoom>, i64)>,
+    ) {
+        let req_response = worker.fetch_rooms_initial().await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to fetch initial rooms {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_fetch_rooms_update(
+        worker: &NCRequestWorker,
+        last_timestamp: i64,
+        response: ApiResponseChannel<(Vec<NCReqDataRoom>, i64)>,
+    ) {
+        let req_response = worker.fetch_rooms_update(last_timestamp).await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to fetch update rooms {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_send_message(
+        worker: &NCRequestWorker,
+        token: String,
+        message: String,
+        response: ApiResponseChannel<NCReqDataMessage>,
+    ) {
+        let req_response = worker.send_message(message, &token).await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to send message {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_autocomplete_users(
+        worker: &NCRequestWorker,
+        name: String,
+        response: ApiResponseChannel<Vec<NCReqDataUser>>,
+    ) {
+        let req_response = worker.fetch_autocomplete_users(&name).await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to fetch autocomplete users {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_fetch_participants(
+        worker: &NCRequestWorker,
+        token: String,
+        response: ApiResponseChannel<Vec<NCReqDataParticipants>>,
+    ) {
+        let req_response = worker.fetch_participants(&token).await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to fetch participants {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
+        }
+    }
+    async fn handle_mark_read(
+        worker: &NCRequestWorker,
+        token: String,
+        last_message: i32,
+        response: ApiResponseChannel<()>,
+    ) {
+        let req_response = worker.mark_chat_read(&token, last_message).await;
+        if let Ok(data_content) = req_response {
+            response.send(Ok(data_content)).expect("could not Send.");
+        } else {
+            log::error!("Failed to mark room as read {req_response:?}");
+            response
+                .send(Err(Arc::new(std::io::Error::new(
+                    ErrorKind::NetworkDown,
+                    format!("Got a Request Rejected! {req_response:?}"),
+                ))))
+                .expect("could not Send.");
         }
     }
 }

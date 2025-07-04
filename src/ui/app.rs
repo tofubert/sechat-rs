@@ -285,6 +285,11 @@ impl<Backend: NCBackend> App<'_, Backend> {
         Ok(())
     }
 
+    pub async fn fetch_all_rooms_history(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.backend.fetch_all_rooms_history().await?;
+        Ok(())
+    }
+
     pub fn new_input_key(&mut self, key: Input) {
         self.input.input(key);
     }
@@ -514,6 +519,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('?') => self.popup = Some(Popup::Help),
             KeyCode::Char('u') => self.toggle_user_sidebar(),
             KeyCode::Char('f') => self.fetch_current_room_history().await?,
+            KeyCode::Char('F') => self.fetch_all_rooms_history().await?,
             _ => (),
         }
         Ok(())
