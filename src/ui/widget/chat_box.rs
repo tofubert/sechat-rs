@@ -2,6 +2,7 @@ use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
 use chrono::{DateTime, Local, Utc};
+use colorhash::ColorHash;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -23,6 +24,7 @@ pub struct ChatBox<'a> {
     unread_message_style: Style,
     table_header_style: Style,
     date_format: String,
+    user_styles: ColorHash,
 }
 
 impl ChatBox<'_> {
@@ -40,6 +42,7 @@ impl ChatBox<'_> {
             default_highlight_style: config.theme.default_highlight_style(),
             table_header_style: config.theme.table_header_style(),
             date_format: config.data.ui.date_format.clone(),
+            user_styles: ColorHash::new().lightness(70.0),
         }
     }
 
@@ -90,6 +93,16 @@ impl ChatBox<'_> {
                 last_date = date_str;
             }
 
+            let colour = self.user_styles.rgb(&message_data.get_actor_id());
+
+            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_sign_loss)]
+            let name_style = Style::new().fg(Color::Rgb(
+                colour.red() as u8,
+                colour.green() as u8,
+                colour.blue() as u8,
+            ));
+
             let name = textwrap::wrap(
                 message_data.get_name().to_string().as_str(),
                 Options::new(NAME_WIDTH.into()).break_words(true),
@@ -97,6 +110,7 @@ impl ChatBox<'_> {
             .into_iter()
             .map(std::borrow::Cow::into_owned)
             .map(Line::from)
+            .map(|l| l.style(name_style))
             .collect_vec();
 
             let message_string = message_data
@@ -237,21 +251,25 @@ mod tests {
         let mut mock_nc_backend = MockNCTalk::new();
         let mut mock_room = MockNCRoomInterface::new();
         let timestamp_1 = DateTime::<Utc>::from_timestamp(2000, 0).unwrap();
+        let actor_id_1 = "abcd1234".to_string();
         let mock_message_1 = NCMessage::from(NCReqDataMessage {
             id: 0,
             message: "Butz".to_string(),
             messageType: "comment".to_string(),
             actorDisplayName: "Hundi".to_string(),
             timestamp: timestamp_1.timestamp(),
+            actorId: actor_id_1.clone(),
             ..Default::default()
         });
         let timestamp_2 = DateTime::<Utc>::from_timestamp(200_000, 0).unwrap();
+        let actor_id_2 = "1234abcd".to_string();
         let mock_message_2 = NCMessage::from(NCReqDataMessage {
             id: 1,
             message: "Bert".to_string(),
             messageType: "comment".to_string(),
             actorDisplayName: "Stinko".to_string(),
             timestamp: timestamp_2.timestamp(),
+            actorId: actor_id_2.clone(),
             ..Default::default()
         });
         let message_tree = BTreeMap::from([(1, mock_message_1), (2, mock_message_2)]);
@@ -294,6 +312,9 @@ mod tests {
 
         terminal.backend().assert_buffer(&expected);
 
+        let user_style_1 = Style::default().fg(Color::Rgb(196, 205, 151)); // Hash for Hundi
+        let user_style_2 = Style::default().fg(Color::Rgb(151, 205, 156)); // Hash for Stinko
+
         chat_box.update_messages(&mock_nc_backend, &"123".to_string());
 
         terminal
@@ -318,6 +339,7 @@ mod tests {
             Rect::new(0, 1, 40, 1),
             config.theme.default_highlight_style(),
         );
+        expected.set_style(Rect::new(6, 2, 20, 1), user_style_1);
         expected.set_style(
             Rect::new(27, 1, 13, 1),
             config
@@ -325,6 +347,7 @@ mod tests {
                 .default_highlight_style()
                 .add_modifier(Modifier::BOLD),
         );
+        expected.set_style(Rect::new(6, 4, 20, 1), user_style_2);
         expected.set_style(
             Rect::new(27, 3, 13, 1),
             config
