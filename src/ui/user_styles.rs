@@ -1,4 +1,4 @@
-use random_color::RandomColor;
+use color_hash::color_hash_hex;
 use ratatui::style::{Color, Style};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

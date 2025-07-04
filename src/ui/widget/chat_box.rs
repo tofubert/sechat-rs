@@ -1,8 +1,8 @@
 use crate::backend::nc_request::Token;
 use crate::backend::{nc_room::NCRoomInterface, nc_talk::NCBackend};
 use crate::config::Config;
-use crate::ui::user_styles::UserStyles;
 use chrono::{DateTime, Local, Utc};
+use colorhash::ColorHash;
 use ratatui::{
     prelude::*,
     widgets::{Block, Cell, HighlightSpacing, Row, Table, TableState},
@@ -24,6 +24,7 @@ pub struct ChatBox<'a> {
     unread_message_style: Style,
     table_header_style: Style,
     date_format: String,
+    user_styles: ColorHash,
 }
 
 impl ChatBox<'_> {
@@ -41,6 +42,7 @@ impl ChatBox<'_> {
             default_highlight_style: config.theme.default_highlight_style(),
             table_header_style: config.theme.table_header_style(),
             date_format: config.data.ui.date_format.clone(),
+            user_styles: ColorHash::new().lightness(70.0),
         }
     }
 
@@ -49,21 +51,15 @@ impl ChatBox<'_> {
         width: u16,
         backend: &impl NCBackend,
         current_room: &Token,
-        user_styles: &mut UserStyles,
     ) {
         let new_width = (width - TIME_WIDTH - 2 - NAME_WIDTH).max(10);
         if self.width != new_width {
             self.width = new_width;
-            self.update_messages(backend, current_room, user_styles);
+            self.update_messages(backend, current_room);
         }
     }
 
-    pub fn update_messages(
-        &mut self,
-        backend: &impl NCBackend,
-        current_room: &Token,
-        user_styles: &mut UserStyles,
-    ) {
+    pub fn update_messages(&mut self, backend: &impl NCBackend, current_room: &Token) {
         use itertools::Itertools;
         use std::convert::TryInto;
 
@@ -97,13 +93,15 @@ impl ChatBox<'_> {
                 last_date = date_str;
             }
 
-            if !user_styles
-                .user_style_map
-                .contains_key(&message_data.get_actor_id())
-            {
-                user_styles.update(&message_data.get_actor_id());
-            }
-            let name_style = user_styles.user_style_map[&message_data.get_actor_id()];
+            let colour = self.user_styles.rgb(&message_data.get_actor_id());
+
+            #[allow(clippy::cast_possible_truncation)]
+            #[allow(clippy::cast_sign_loss)]
+            let name_style = Style::new().fg(Color::Rgb(
+                colour.red() as u8,
+                colour.green() as u8,
+                colour.blue() as u8,
+            ));
 
             let name = textwrap::wrap(
                 message_data.get_name().to_string().as_str(),
@@ -230,7 +228,7 @@ impl StatefulWidget for &ChatBox<'_> {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::BTreeMap;
 
     use crate::backend::nc_message::NCMessage;
     use crate::backend::nc_request::{NCReqDataMessage, NCReqDataParticipants};
@@ -316,14 +314,8 @@ mod tests {
 
         let user_style_1 = Style::default().fg(Color::Red);
         let user_style_2 = Style::default().fg(Color::Green);
-        let mut user_styles = UserStyles {
-            user_style_map: HashMap::from([
-                (actor_id_1.clone(), user_style_1),
-                (actor_id_2.clone(), user_style_2),
-            ]),
-            ..Default::default()
-        };
-        chat_box.update_messages(&mock_nc_backend, &"123".to_string(), &mut user_styles);
+
+        chat_box.update_messages(&mock_nc_backend, &"123".to_string());
 
         terminal
             .draw(|frame| chat_box.render_area(frame, Rect::new(0, 0, 40, 10)))
