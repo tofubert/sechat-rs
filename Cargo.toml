@@ -32,8 +32,8 @@ tempfile = "=3.20.0"
 
 
 [dependencies]
-reqwest = { version = "=0.12.20", features = ["json"] }
-tokio = { version = "=1.45.1", features = ["full"] }
+reqwest = { version = "=0.12.22", features = ["json"] }
+tokio = { version = "=1.46.0", features = ["full"] }
 serde = { version = "=1.0.219", features = ["derive"] }
 serde_json = "=1.0.140"
 jzon = "=0.12.5"
@@ -64,7 +64,7 @@ tracing = "=0.1.41"
 cfg-if = "=1.0.1"
 tui-textarea = "=0.7.0"
 async-trait = "=0.1.88"
-serde_with = "=3.13.0"
+serde_with = "=3.14.0"
 tokio-util = "=0.7.15"
 tui-logger = { version = "=0.17.3", features = ["crossterm" ] }
 
