@@ -87,7 +87,7 @@ pub fn init(path_arg: &str) -> Result<Config, String> {
     let config_path = config_path_base.join("config.toml");
     let theme_path = config_path_base.join("theme.toml");
 
-    println!("Config Path: {:?}", config_path.as_os_str());
+    println!("Config Path: {}", config_path.display());
 
     check_config_exists_else_create_new::<ConfigOptions>(&config_path)?;
     check_config_exists_else_create_new::<ColorPalette>(&theme_path)?;
