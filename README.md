@@ -6,6 +6,7 @@
 [![Documentation](https://docs.rs/sechat-rs/badge.svg)](https://docs.rs/sechat-rs/)
 [![Codecov](https://codecov.io/github/tofubert/sechat-rs/branch/main/graph/badge.svg?token=CUBVLZ27KS)](https://codecov.io/github/tofubert/sechat-rs)
 [![Dependency status](https://deps.rs/repo/github/tofubert/sechat-rs/status.svg)](https://deps.rs/repo/github/tofubert/sechat-rs)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftofubert%2Fsechat-rs.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftofubert%2Fsechat-rs?ref=badge_shield)
 
 
 ## Setup
@@ -52,3 +53,7 @@ Thank to Sebastian for sugesting the name in the first place.
 
 ## Sponsors
 Thanks to [emlix gmbh](https://github.com/emlix) for allowing [@tofu](https://github.com/tofubert) and other so spend some of their work time to tinker with this.
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Ftofubert%2Fsechat-rs.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Ftofubert%2Fsechat-rs?ref=badge_large)
