@@ -8,7 +8,7 @@ use base64::{prelude::BASE64_STANDARD, write::EncoderWriter};
 use jzon;
 use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
-    Client, Response, Url,
+    Client, Response, StatusCode, Url,
 };
 use std::{collections::HashMap, error::Error};
 use std::{fmt::Debug, time::Duration};
@@ -24,6 +24,7 @@ pub struct NCRequestWorker {
     client: Client,
     base_headers: HeaderMap,
     json_dump_path: Option<std::path::PathBuf>,
+    max_retries: u32,
 }
 
 #[async_trait]
@@ -60,7 +61,6 @@ pub trait NCRequestWorkerInterface: Debug + Send + Send + Sync + Sized {
         maxMessage: i32,
         last_message: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
-    async fn retry_request(&self, url: Url, max_retries: u32) -> Result<String, reqwest::Error>;
 }
 
 impl NCRequestWorker {
@@ -153,13 +153,71 @@ impl NCRequestWorker {
     }
 
     async fn request_post(&self, url: Url) -> Result<Response, reqwest::Error> {
-        let builder = self.client.post(url);
-        builder.send().await
+        let mut attempts = 0;
+
+        loop {
+            let builder = self.client.post(url.clone());
+            match builder.send().await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        return Ok(response);
+                    } else if response.status().is_server_error() && attempts < self.max_retries {
+                        // Retry server errors
+                        attempts += 1;
+                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
+                        log::warn!("Server error, retrying in {delay:?}...");
+                        sleep(delay).await;
+                        continue;
+                    }
+                    return Err(response.error_for_status().unwrap_err());
+                }
+                Err(err) => {
+                    if (err.is_connect() || err.is_timeout()) && attempts < self.max_retries {
+                        attempts += 1;
+                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
+                        log::warn!("Network error, retrying in {delay:?}...");
+                        sleep(delay).await;
+                        continue;
+                    }
+                    return Err(err);
+                }
+            }
+        }
     }
 
     async fn request(&self, url: Url) -> Result<Response, reqwest::Error> {
-        let builder = self.client.get(url);
-        builder.send().await
+        let mut attempts = 0;
+
+        loop {
+            let builder = self.client.get(url.clone());
+            match builder.send().await {
+                Ok(response) => {
+                    if response.status().is_success()
+                        || response.status() == StatusCode::from_u16(304).unwrap()
+                    {
+                        return Ok(response);
+                    } else if response.status().is_server_error() && attempts < self.max_retries {
+                        // Retry server errors
+                        attempts += 1;
+                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
+                        log::warn!("Server error, retrying in {delay:?}...");
+                        sleep(delay).await;
+                        continue;
+                    }
+                    return Err(response.error_for_status().unwrap_err());
+                }
+                Err(err) => {
+                    if (err.is_connect() || err.is_timeout()) && attempts < self.max_retries {
+                        attempts += 1;
+                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
+                        log::warn!("Network error, retrying in {delay:?}...");
+                        sleep(delay).await;
+                        continue;
+                    }
+                    return Err(err);
+                }
+            }
+        }
     }
 
     fn dump_json_to_log(&self, url: &str, text: &str) -> Result<(), Box<dyn Error>> {
@@ -219,39 +277,8 @@ impl NCRequestWorkerInterface for NCRequestWorker {
             client,
             base_headers: headers,
             json_dump_path,
+            max_retries: 3,
         })
-    }
-
-    async fn retry_request(&self, url: Url, max_retries: u32) -> Result<String, reqwest::Error> {
-        let mut attempts = 0;
-
-        loop {
-            match self.request(url.clone()).await {
-                Ok(response) => {
-                    if response.status().is_success() {
-                        return response.text().await;
-                    } else if response.status().is_server_error() && attempts < max_retries {
-                        // Retry server errors
-                        attempts += 1;
-                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
-                        log::warn!("Server error, retrying in {delay:?}...");
-                        sleep(delay).await;
-                        continue;
-                    }
-                    return Err(response.error_for_status().unwrap_err());
-                }
-                Err(err) => {
-                    if (err.is_connect() || err.is_timeout()) && attempts < max_retries {
-                        attempts += 1;
-                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
-                        log::warn!("Network error, retrying in {delay:?}...");
-                        sleep(delay).await;
-                        continue;
-                    }
-                    return Err(err);
-                }
-            }
-        }
     }
 
     async fn send_message(
@@ -286,7 +313,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         let url_string = self.base_url.clone() + "/ocs/v2.php/core/autocomplete/get";
         let params = HashMap::from([("limit", "200"), ("search", name)]);
         let url = Url::parse_with_params(&url_string, params)?;
-        let text = self.retry_request(url, 3).await?;
+        let text = self.request(url).await?.text().await?;
 
         match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataUser>>>(&text) {
             Ok(parser_response) => Ok(parser_response.ocs.data),
@@ -309,7 +336,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         let params = HashMap::from([("includeStatus", "true")]);
         let url = Url::parse_with_params(&url_string, params)?;
 
-        let text = self.retry_request(url, 3).await?;
+        let text = self.request(url).await?.text().await?;
 
         match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataParticipants>>>(&text) {
             Ok(parser_response) => Ok(parser_response.ocs.data),
@@ -425,7 +452,6 @@ mock! {
             maxMessage: i32,
             last_message: i32,
         ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
-        async fn retry_request(&self, url: Url, max_retries: u32) -> Result<String, reqwest::Error>;
     }
 }
 
