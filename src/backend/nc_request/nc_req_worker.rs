@@ -10,8 +10,9 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
     Client, Response, Url,
 };
-use std::fmt::Debug;
 use std::{collections::HashMap, error::Error};
+use std::{fmt::Debug, time::Duration};
+use tokio::time::sleep;
 
 use super::{
     NCReqDataMessage, NCReqDataParticipants, NCReqDataRoom, NCReqDataUser, NCReqOCSWrapper, Token,
@@ -59,6 +60,7 @@ pub trait NCRequestWorkerInterface: Debug + Send + Send + Sync + Sized {
         maxMessage: i32,
         last_message: i32,
     ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+    async fn retry_request(&self, url: Url, max_retries: u32) -> Result<String, reqwest::Error>;
 }
 
 impl NCRequestWorker {
@@ -220,6 +222,38 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         })
     }
 
+    async fn retry_request(&self, url: Url, max_retries: u32) -> Result<String, reqwest::Error> {
+        let mut attempts = 0;
+
+        loop {
+            match self.request(url.clone()).await {
+                Ok(response) => {
+                    if response.status().is_success() {
+                        return response.text().await;
+                    } else if response.status().is_server_error() && attempts < max_retries {
+                        // Retry server errors
+                        attempts += 1;
+                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
+                        log::warn!("Server error, retrying in {delay:?}...");
+                        sleep(delay).await;
+                        continue;
+                    }
+                    return Err(response.error_for_status().unwrap_err());
+                }
+                Err(err) => {
+                    if (err.is_connect() || err.is_timeout()) && attempts < max_retries {
+                        attempts += 1;
+                        let delay = Duration::from_millis(1000 * 2_u64.pow(attempts - 1));
+                        log::warn!("Network error, retrying in {delay:?}...");
+                        sleep(delay).await;
+                        continue;
+                    }
+                    return Err(err);
+                }
+            }
+        }
+    }
+
     async fn send_message(
         &self,
         message: String,
@@ -252,26 +286,15 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         let url_string = self.base_url.clone() + "/ocs/v2.php/core/autocomplete/get";
         let params = HashMap::from([("limit", "200"), ("search", name)]);
         let url = Url::parse_with_params(&url_string, params)?;
-        let response = self.request(url).await?;
+        let text = self.retry_request(url, 3).await?;
 
-        match response.status() {
-            reqwest::StatusCode::OK => {
-                let text = response.text().await?;
-                match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataUser>>>(&text) {
-                    Ok(parser_response) => Ok(parser_response.ocs.data),
-                    Err(why) => {
-                        self.dump_json_to_log(&url_string, &text)?;
-                        log::debug!("{url_string} with {why:?}");
-                        Err(Box::new(why))
-                    }
-                }
+        match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataUser>>>(&text) {
+            Ok(parser_response) => Ok(parser_response.ocs.data),
+            Err(why) => {
+                self.dump_json_to_log(&url_string, &text)?;
+                log::debug!("{url_string} with {why:?}");
+                Err(Box::new(why))
             }
-            _ => Err(Box::new(
-                response
-                    .error_for_status()
-                    .err()
-                    .ok_or("Failed to convert Err in reqwest")?,
-            )),
         }
     }
 
@@ -286,25 +309,15 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         let params = HashMap::from([("includeStatus", "true")]);
         let url = Url::parse_with_params(&url_string, params)?;
 
-        let response = self.request(url).await?;
-        match response.status() {
-            reqwest::StatusCode::OK => {
-                let text = response.text().await?;
-                match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataParticipants>>>(&text) {
-                    Ok(parser_response) => Ok(parser_response.ocs.data),
-                    Err(why) => {
-                        self.dump_json_to_log(&url_string, &text)?;
-                        log::debug!("{url_string} with {why:?}");
-                        Err(Box::new(why))
-                    }
-                }
+        let text = self.retry_request(url, 3).await?;
+
+        match serde_json::from_str::<NCReqOCSWrapper<Vec<NCReqDataParticipants>>>(&text) {
+            Ok(parser_response) => Ok(parser_response.ocs.data),
+            Err(why) => {
+                self.dump_json_to_log(&url_string, &text)?;
+                log::debug!("{url_string} with {why:?}");
+                Err(Box::new(why))
             }
-            _ => Err(Box::new(
-                response
-                    .error_for_status()
-                    .err()
-                    .ok_or("Failed to convert Err in reqwest")?,
-            )),
         }
     }
 
@@ -412,6 +425,7 @@ mock! {
             maxMessage: i32,
             last_message: i32,
         ) -> Result<Vec<NCReqDataMessage>, Box<dyn Error>>;
+        async fn retry_request(&self, url: Url, max_retries: u32) -> Result<String, reqwest::Error>;
     }
 }
 
