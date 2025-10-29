@@ -48,7 +48,7 @@ A list of planned and requested freatures is also kept there.
 
 ## The Name
 Originally intended to be called seshat, after the egyptian goddess of writing, a typo became sechat.
-Thank to Sebastian for sugesting the name in the first place.
+Thank to Sebastian for suggesting the name in the first place.
 
 ## Sponsors
 Thanks to [emlix gmbh](https://github.com/emlix) for allowing [@tofu](https://github.com/tofubert) and other so spend some of their work time to tinker with this.
