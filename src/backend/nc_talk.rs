@@ -418,7 +418,7 @@ impl<Requester: NCRequestInterface + 'static + std::marker::Sync> NCBackend for 
         &mut self,
         token: &Token,
     ) -> Result<Option<(String, usize)>, Box<dyn Error>> {
-        log::debug!("selected room {}", token);
+        log::debug!("selected room {token}");
         self.rooms
             .get_mut(token)
             .ok_or_else(|| format!("Failed to get Room ref for room selection: {token}."))?

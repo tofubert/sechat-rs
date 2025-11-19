@@ -63,8 +63,8 @@ impl TitleBar<'_> {
             status = user.and_then(|user| user.status.clone());
             status_text = user.and_then(|user| match (&user.statusIcon, &user.statusMessage) {
                 (None, None) => None,
-                (None, Some(msg)) => Some(msg.to_string()),
-                (Some(icon), None) => Some(icon.to_string()),
+                (None, Some(msg)) => Some(msg.clone()),
+                (Some(icon), None) => Some(icon.clone()),
                 (Some(icon), Some(msg)) => Some(format!("{icon} {msg}")),
             });
         }

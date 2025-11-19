@@ -213,7 +213,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         log::trace!("Worker Ready {base_url}");
 
         Ok(NCRequestWorker {
-            base_url: base_url.to_string(),
+            base_url: base_url.clone(),
             client,
             base_headers: headers,
             json_dump_path,
@@ -356,7 +356,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         let url_string =
             self.base_url.clone() + "/ocs/v2.php/apps/spreed/api/v1/chat/" + token + "/read";
         let url = Url::parse(&url_string)?;
-        log::trace!("Marking {} as read", token);
+        log::trace!("Marking {token} as read");
         let response = self.request_post(url).await?;
         match response.status() {
             reqwest::StatusCode::OK => Ok(()),
