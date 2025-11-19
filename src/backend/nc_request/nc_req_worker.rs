@@ -213,7 +213,7 @@ impl NCRequestWorkerInterface for NCRequestWorker {
         log::trace!("Worker Ready {base_url}");
 
         Ok(NCRequestWorker {
-            base_url: base_url.to_string(),
+            base_url: base_url.clone(),
             client,
             base_headers: headers,
             json_dump_path,
