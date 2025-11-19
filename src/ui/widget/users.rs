@@ -48,7 +48,7 @@ impl Users<'_> {
             .map(|user| {
                 Row::new([{
                     if let Some(status) = &user.status {
-                        Cell::new(user.displayName.to_string()).set_style(match status.as_str() {
+                        Cell::new(user.displayName.clone()).set_style(match status.as_str() {
                             "away" => self.user_away_style,
                             "offline" => self.user_offline_style,
                             "dnd" => self.user_dnd_style,
@@ -59,7 +59,7 @@ impl Users<'_> {
                             }
                         })
                     } else {
-                        Cell::new(user.displayName.to_string()).style(self.default_style)
+                        Cell::new(user.displayName.clone()).style(self.default_style)
                     }
                 }])
             })

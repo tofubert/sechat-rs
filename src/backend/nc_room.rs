@@ -37,7 +37,7 @@ pub enum NCRoomTypes {
 use mockall::{automock, predicate::*};
 
 /// Room Interface Trait
-/// Holds all public functions for operations on NC Talk Rooms. For details see [NCRoom].
+/// Holds all public functions for operations on NC Talk Rooms. For details see [`NCRoom`].
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
@@ -76,7 +76,7 @@ pub trait NCRoomInterface: Debug + Send + Display + Ord + Default {
     /// Get the rooms token.
     fn to_token(&self) -> Token;
     /// Check if the message ID is newer than the stored one and update the content.
-    /// This is needed since the NCTalk will fetch all rooms and only get the overview data.
+    /// This is needed since the `NCTalk` will fetch all rooms and only get the overview data.
     async fn update_if_id_is_newer<Requester: NCRequestInterface + 'static + std::marker::Sync>(
         &mut self,
         message_id: i32,
@@ -622,7 +622,7 @@ mod tests {
 
     impl PartialOrd for MockNCRoomInterface {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(self.to_string().cmp(&other.to_string()))
+            Some(self.cmp(other))
         }
     }
 

@@ -37,7 +37,7 @@ impl ChatSelector<'_> {
                         .iter()
                         .map(|token| {
                             TreeItem::new_leaf::<String>(
-                                token.to_string(),
+                                token.clone(),
                                 backend.get_room(token).get_display_name().into(),
                             )
                         })
@@ -52,7 +52,7 @@ impl ChatSelector<'_> {
                         .iter()
                         .map(|token| {
                             TreeItem::new_leaf::<String>(
-                                token.to_string(),
+                                token.clone(),
                                 backend.get_room(token).get_display_name().into(),
                             )
                         })
@@ -66,7 +66,7 @@ impl ChatSelector<'_> {
                         .get_dm_keys_display_name_mapping()
                         .iter()
                         .map(|(token, display_name)| {
-                            TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
+                            TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
                         })
                         .collect_vec(),
                 )
@@ -78,7 +78,7 @@ impl ChatSelector<'_> {
                         .get_group_keys_display_name_mapping()
                         .iter()
                         .map(|(token, display_name)| {
-                            TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
+                            TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
                         })
                         .collect_vec(),
                 )
@@ -89,7 +89,7 @@ impl ChatSelector<'_> {
                 .iter()
                 .map(|&token| {
                     (
-                        token.to_string(),
+                        token.clone(),
                         backend.get_room(token).get_display_name().into(),
                     )
                 })
@@ -111,7 +111,7 @@ impl ChatSelector<'_> {
                     .iter()
                     .map(|token| {
                         TreeItem::new_leaf::<String>(
-                            token.to_string(),
+                            token.clone(),
                             backend.get_room(token).get_display_name().into(),
                         )
                     })
@@ -125,7 +125,7 @@ impl ChatSelector<'_> {
                     .iter()
                     .map(|token| {
                         TreeItem::new_leaf::<String>(
-                            token.to_string(),
+                            token.clone(),
                             backend.get_room(token).get_display_name().into(),
                         )
                     })
@@ -138,7 +138,7 @@ impl ChatSelector<'_> {
                     .get_dm_keys_display_name_mapping()
                     .iter()
                     .map(|(token, display_name)| {
-                        TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
+                        TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
                     })
                     .collect_vec(),
             )?,
@@ -149,7 +149,7 @@ impl ChatSelector<'_> {
                     .get_group_keys_display_name_mapping()
                     .iter()
                     .map(|(token, display_name)| {
-                        TreeItem::new_leaf::<String>(token.to_string(), display_name.clone())
+                        TreeItem::new_leaf::<String>(token.clone(), display_name.clone())
                     })
                     .collect_vec(),
             )?,
@@ -159,7 +159,7 @@ impl ChatSelector<'_> {
             .iter()
             .map(|&token| {
                 (
-                    token.to_string(),
+                    token.clone(),
                     backend.get_room(token).get_display_name().into(),
                 )
             })

@@ -14,6 +14,26 @@ dependencies = ["lint", "clippy", "check", "test"]
 description = "Run all tasks"
 dependencies = ["format", "lint-typos", "clippy", "check", "dependencies", "build", "coverage-text"]
 
+[tasks.install-tools]
+description = "Install tools needed beside cargo-make to run all needed cmds"
+command = "cargo"
+args = [
+  "install",
+  "cargo-llvm-cov",
+  "cargo-check",
+  "typos-cli",
+  "cargo-audit",
+  "cargo-deny",
+  "cargo-update",
+]
+
+[tasks.update-tools]
+description = "Update tools used for building/testing/linting"
+command = "cargo"
+args = [
+  "install-update",
+  "-a",
+]
 
 [tasks.clippy]
 description = "Run Clippy for linting"
