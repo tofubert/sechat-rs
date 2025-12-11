@@ -9,7 +9,7 @@ allow = [
     "ISC",
     "MIT",
     "Unicode-3.0",
-    "GPL-3.0-only",
+    "GPL-3.0-or-later",
     "BSL-1.0"
 ]
 exceptions = [
