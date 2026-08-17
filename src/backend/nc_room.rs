@@ -345,7 +345,7 @@ impl NCRoomInterface for NCRoom {
         message: String,
         requester: Arc<Mutex<Requester>>,
     ) -> Result<String, Box<dyn std::error::Error>> {
-        log::info!("Send Message {}", &message);
+        log::info!("Send Message {message}");
         let response_onceshot = {
             requester
                 .lock()

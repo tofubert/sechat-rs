@@ -50,7 +50,7 @@ impl NCMessage {
         self.0
             .reactions
             .iter()
-            .map(|(icon, number)| format!("('{icon}' times {}), ", &number.to_string()))
+            .map(|(icon, number)| format!("('{icon}' times {number}), "))
             .collect::<Vec<_>>()
             .join(", ")
     }
