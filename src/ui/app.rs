@@ -27,17 +27,17 @@ use crate::{
 use ratatui::{
     crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind},
     layout::{Alignment, Constraint, Direction, Flex, Layout, Position},
-    style::{Style, Stylize},
+    style::Style,
     widgets::{Block, Clear, Paragraph},
     Frame, Terminal,
 };
 use strum_macros::Display;
 
+use ratatui_textarea::Input;
 use tokio::time::Instant;
-use tui_textarea::Input;
 
 use ratatui::crossterm::event::{poll, read};
-use tui_textarea::Key;
+use ratatui_textarea::Key;
 
 use super::{notifications::NotifyWrapper, widget::logger::LogBox};
 
@@ -321,9 +321,9 @@ impl<Backend: NCBackend> App<'_, Backend> {
         self.backend.write_to_log()
     }
 
-    async fn run_app<B: ratatui::prelude::Backend>(
+    async fn run_app(
         &mut self,
-        mut terminal: Terminal<B>,
+        mut terminal: Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.select_room().await?;
         log::info!("Entering Main Loop");
@@ -332,7 +332,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             terminal.draw(|f| self.ui(f))?;
 
             // Event within timeout?
-            if poll(std::time::Duration::from_millis(3000))? {
+            if poll(std::time::Duration::from_secs(3))? {
                 match self.process_event(read()?).await {
                     Ok(ProcessEventResult::Continue) => (),
                     Ok(ProcessEventResult::Exit) => return Ok(()),
@@ -343,7 +343,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
                 // trigger a fetch from upstream for messages
                 self.fetch_updates().await?;
             }
-            if write_back_timer.elapsed() > tokio::time::Duration::from_secs(300) {
+            if write_back_timer.elapsed() > tokio::time::Duration::from_mins(5) {
                 write_back_timer = Instant::now();
                 self.write_log_files()?;
             }
@@ -488,7 +488,7 @@ impl<Backend: NCBackend> App<'_, Backend> {
             KeyCode::Char('?') => self.popup = Some(Popup::Help),
             KeyCode::Char('y') => {
                 if let Err(err) = self.write_log_files() {
-                    log::warn!("Failure to store logs into log file ({err}), ignoring for now.",);
+                    log::warn!("Failure to store logs into log file ({err}), ignoring for now.");
                 }
                 return Some(Ok(ProcessEventResult::Exit));
             }

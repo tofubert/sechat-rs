@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use tui_textarea::TextArea;
+use ratatui_textarea::TextArea;
 use tui_tree_widget::{Tree, TreeItem, TreeState};
 
 use crate::backend::nc_talk::NCBackend;

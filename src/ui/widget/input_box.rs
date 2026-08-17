@@ -1,9 +1,7 @@
 use crate::config::Config;
-use ratatui::{
-    prelude::*,
-    widgets::{Block, Borders},
-};
-use tui_textarea::TextArea;
+use ratatui::widgets::Block;
+use ratatui::{prelude::*, widgets::Borders};
+use ratatui_textarea::TextArea;
 
 #[derive(Default)]
 pub struct InputBox<'a> {

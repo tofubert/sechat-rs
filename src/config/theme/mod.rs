@@ -1,5 +1,4 @@
 use ratatui::style::Style;
-use ratatui::style::Stylize;
 
 pub mod options;
 
