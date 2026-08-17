@@ -10,7 +10,8 @@ allow = [
     "MIT",
     "Unicode-3.0",
     "GPL-3.0-or-later",
-    "BSL-1.0"
+    "BSL-1.0",
+    "CDLA-Permissive-2.0"
 ]
 exceptions = [
     # Use exceptions for these as they only have a single user
